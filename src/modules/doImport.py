@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 import pathlib
 import os
 # from .prepData import ScoringType
-# from ..util.webClient import *
-# from ..scraper.scraper import *
+from ..scraper.webClient import *
+from ..scraper.scraper import *
 
 # Dictionary mapping fantasydata.com team abbreviations to pro-football-reference team abbreviations
 ADP_TO_PFR = {'ARI':'ARI','ATL':'ATL','BAL':'BAL','BUF':'BUF','CAR':'CAR',
@@ -24,18 +24,20 @@ PFR_LINK = 'https://www.pro-football-reference.com/years/{yr}/fantasy.htm'
 class Importer(ABC):
     def __init__(self, fullSavePath : str):
         self.fullSavePath = fullSavePath
-        self.willSave = False
 
     @abstractmethod
     def doImport(self):
         pass
     
-    def _save(self, object : Any, savePath : str = None) -> None:
+    def _save(self, object : Any, savePath : str = None, **kwargs) -> None:
         if not savePath:
             savePath = self.fullSavePath
-        with open(savePath, 'wb') as handle:
-            pickle.dump(object, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print(f"Saved {self.__class__.__name__} object to {savePath}")
+        if isinstance(object, pd.DataFrame):
+            object.to_pickle(savePath, **kwargs)
+        else:
+            with open(savePath, 'wb') as handle:
+                pickle.dump(object, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                print(f"Saved {self.__class__.__name__} object to {savePath}")
     
 class PointsImport(Importer):
     def __init__(self, fullSavePath : str, year = datetime.date.today().year):
@@ -69,50 +71,41 @@ class PointsImport(Importer):
             self._save(fpts_dict)
         return fpts_dict
         
-class RosterImport(SeleniumWebScraper):
-    def __init__(self, fullSavePath : str, webClient : SeleniumClient = SeleniumClient('https://www.pro-football-reference.com/'), base = 'https://www.pro-football-reference.com/', year = datetime.date.today().year):
-        super().__init__(webClient, base)
-        print(self.web_client)
+class RosterImport(SeleniumWebScraper, Importer):
+    def __init__(self, 
+                 fullSavePath : str, 
+                 webClient : SeleniumClient = SeleniumClient('https://www.pro-football-reference.com/'), 
+                 base = 'https://www.pro-football-reference.com/', 
+                 year = datetime.date.today().year):
+        super().__init__(webClient, base) # Rely on MRO to call SeleniumWebScraper constructor
         self.fullSavePath = fullSavePath
         self.year = year
         self.webClient = webClient
     
     def _getSinglePandasTableFromLink(self, endpoint : str, **kwargs) -> pd.DataFrame:
-        elementName = kwargs.get('elementName', None)
-        self.web_client.get(endpoint)
-        try:
-            html_table : str = self.web_client.getOuterHtmlOfElementByXpath(elementName)
-        except:
-            print(f"Wasn't able to identify element {elementName} at current web page: {endpoint}")
-            return None
-        
-        # Add ids Series to DataFrame
-        res = pd.read_html(html_table, flavor = 'html5lib')
-        if len(res) > 1:
-            print("Identified more than one table - returning first one")    
-        df = res[0]
+        df = super()._getSinglePandasTableFromLink(endpoint, **kwargs)
         df = df[df['No.'] != 'No.'].reset_index().drop('index', axis = 1).copy()
         
+        # Add pfref identifier
         elems = self._getSpecificElementsFromCurrent(xpath_expression = '//*[@id="roster"]//td[@data-append-csv]')
         new_dict = {elem.text : elem.get_attribute('data-append-csv') for elem in elems}
-        new_df = pd.DataFrame(list(new_dict.items()), columns=['Player', 'ID'])
-        
-        df = df.merge(new_df, on ='Player', how = 'left')
-        print(df)
-        return df
+        player_ref_df = pd.DataFrame(list(new_dict.items()), columns=['Player', 'ID'])
+        return df.merge(player_ref_df, on ='Player', how = 'left')
     
-    def doImport(self) -> pd.DataFrame:
+    def doImport(self, save : bool = True) -> pd.DataFrame:
         pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])]
-        for team in pfr_abbrv_list[4:5]:
+        for team in pfr_abbrv_list:
             endpoint = f'https://www.pro-football-reference.com/teams/{team.lower()}/2023_roster.htm'        
             tab = self._getSinglePandasTableFromLink(endpoint, elementName = '//table[@id="roster"]')
             tab['tm'] = team
-            roster2023path = '../../data/scraping/rosters2023.csv'
-            if os.path.exists(roster2023path):
-                tab.to_csv(roster2023path, header = False, mode = 'a')
-            else:
-                tab.to_csv(roster2023path)
-        return pd.read_csv(roster2023path)
+            rosterPath = f'./data/scraping/rosters{self.year}.csv'
+            if save:
+                if os.path.exists(rosterPath):
+                    header = False; mode ='a'
+                else:
+                    header = True; mode = 'w'
+                self._save(tab, rosterPath, header = header, mode = mode)
+        return pd.read_csv(rosterPath)
 
 # class ADPImport(Importer):
 #     def __init__(self, fullSavePath : str, year = datetime.date.today().year, scoring_type : ScoringType = ScoringType.PPR):
@@ -221,15 +214,15 @@ class RosterImport(SeleniumWebScraper):
 if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
-    print('a')
+    print(os.getcwd())
     
     # =======
     # Roster
     # =======
+    roster_2023_pickle = '../../data/research/created/roster2023.p'
+    # pd.read_pickle(roster_2023_pickle)
     roster_importer = RosterImport(fullSavePath = roster_2023_pickle, year = 2023)
     df_roster = roster_importer.doImport()
-    # roster_2023_pickle = '../../data/research/created/roster2023.p'
-    # pd.read_pickle(roster_2023_pickle)
     
     # print(df_roster)
 

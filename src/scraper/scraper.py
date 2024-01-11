@@ -1,6 +1,5 @@
-from ..util.webClient import RequestLimiter, GenericWebClient, SeleniumClient
+from .webClient import GenericWebClient, SeleniumClient
 from selenium.webdriver.remote.webelement import WebElement
-from ..util.config import Config
 import os
 from bs4 import BeautifulSoup
 import pandas as pd
