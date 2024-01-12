@@ -48,7 +48,7 @@ class SeleniumWebScraper(WebScraper):
         except:
             print(f"Wasn't able to identify element {elementName} at current web page: {endpoint}")
             return None
-        res = pd.read_html(html_table, header = 1, flavor = 'html5lib')
+        res = pd.read_html(html_table, header = kwargs.get('header', 1), flavor = 'html5lib')
         
         if len(res) > 1:
             print("Identified more than one table - returning first one")    
