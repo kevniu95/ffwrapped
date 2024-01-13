@@ -17,8 +17,6 @@ from aiolimiter import AsyncLimiter
 
 from ..domain.common import ScoringType, thisFootballYear
 
-
-
 # Dictionary mapping fantasydata.com team abbreviations to pro-football-reference team abbreviations
 ADP_TO_PFR = {'ARI':'ARI','ATL':'ATL','BAL':'BAL','BUF':'BUF','CAR':'CAR',
                 'CHI':'CHI','CIN':'CIN','CLE':'CLE','DAL':'DAL','DEN':'DEN',
@@ -132,8 +130,6 @@ class RosterImport(Importer):
         pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])]
         # Split pfr_abbrv_list into chunks of size 18
         pfr_abbrv_list = [pfr_abbrv_list[i:i + chunkSize] for i in range(0, len(pfr_abbrv_list), chunkSize)]
-        print(pfr_abbrv_list[0])
-        print(pfr_abbrv_list[1])
         for chunk in pfr_abbrv_list:
             print(f"Scraping chunk with {len(chunk)} teams...")
             self._saveChunkToRosterCsv(chunk, save)
