@@ -14,6 +14,7 @@ import pandas as pd
 from websockets import client
 from aiolimiter import AsyncLimiter
 import random
+import time
 
 
 
@@ -116,9 +117,8 @@ class RosterImport(Importer):
             tasks.append(self.scrape_table_to_df(endpoint, limiter))
         return await asyncio.gather(*tasks)
     
-    def doImport(self, save : bool = False) -> pd.DataFrame:
-        pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])][20:]
-        rosters_2023 = asyncio.get_event_loop().run_until_complete(self.scrape_all_teams(pfr_abbrv_list))
+    def _saveChunkToRosterCsv(self, chunk: List[str], save: bool) -> None:
+        rosters_2023 = asyncio.get_event_loop().run_until_complete(self.scrape_all_teams(chunk))
         rosters_df = pd.concat(rosters_2023)
         if save:
             mode = 'w'; header = True
@@ -126,7 +126,19 @@ class RosterImport(Importer):
                 mode = 'a'
                 header = False
             self._save(rosters_df, mode = mode, header = header)
-        return rosters_df
+
+    def doImport(self, save : bool = False, chunkSize: int = 18) -> pd.DataFrame:
+        pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])]
+        # Split pfr_abbrv_list into chunks of size 18
+        pfr_abbrv_list = [pfr_abbrv_list[i:i + chunkSize] for i in range(0, len(pfr_abbrv_list), chunkSize)]
+        print(pfr_abbrv_list[0])
+        print(pfr_abbrv_list[1])
+        for chunk in pfr_abbrv_list:
+            print(f"Scraping chunk with {len(chunk)} teams...")
+            self._saveChunkToRosterCsv(chunk, save)
+            if chunk != pfr_abbrv_list[-1]:
+                time.sleep(60)
+        return pd.read_csv(self.fullSavePath)
         
 class ADPImport(Importer):
     def __init__(self, 
@@ -244,9 +256,9 @@ if __name__ == '__main__':
     # =======
     # Roster
     # =======
-    # roster_importer = RosterImport('../../data/created/scraping/rosters{}.csv')
-    # df_roster = roster_importer.doImport(save = True)
-    # print(df_roster)
+    roster_importer = RosterImport('../../data/created/scraping/rosters{}.csv')
+    df_roster = roster_importer.doImport(save = True)
+    print(df_roster)
 
     # =======
     # ADP
@@ -261,12 +273,6 @@ if __name__ == '__main__':
     # =======
     # Points
     # =======
-    points_pickle = '../../data/created/points.p'
-    # pd.read_pickle(points_pickle)
-    pt_importer = PointsImport(points_pickle)
-    fpts_dict = pt_importer.doImport(save = True)
-    
-    # New import on 8.31
-    points_2000_2012_pickle = '../../data/created/points_2000_2012.p'
-    # pt_importer1 = PointsImport(fullSavePath = points_2000_2012_pickle)
-    # pt_importer1.doImport(save = True, start_year = 2000, end_year = 2013)
+    # points_pickle = '../../data/created/points.p'
+    # pt_importer = PointsImport(points_pickle)
+    # fpts_dict = pt_importer.doImport(save = True)
