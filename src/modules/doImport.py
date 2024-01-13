@@ -7,12 +7,13 @@ from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 import pathlib
 import os
-from ..domain.common import ScoringType
+from ..domain.common import ScoringType, thisFootballYear
 import asyncio
 from pyppeteer import launch
 import pandas as pd
 from websockets import client
 from aiolimiter import AsyncLimiter
+import random
 
 
 
@@ -45,7 +46,9 @@ class Importer(ABC):
                 print(f"Saved {self.__class__.__name__} object to {savePath}")
     
 class PointsImport(Importer):
-    def __init__(self, fullSavePath : str, year = datetime.date.today().year):
+    def __init__(self, 
+                 fullSavePath : str, 
+                 year = thisFootballYear()):
         super().__init__(fullSavePath)
         self.year = year
 
@@ -82,18 +85,19 @@ class PointsImport(Importer):
 
 class RosterImport(Importer):
     def __init__(self, 
-                 fullSavePath : str = None, 
-                 year = datetime.date.today().year):
-        super().__init__(fullSavePath)
-        self.year = year    
-        if not self.fullSavePath:
-            self.fullSavePath = f'../../data/scraping/rosters{self.year}.csv'
+                 fullSavePath : str, 
+                 year = thisFootballYear()):
+        if '{}' in fullSavePath:
+            self.fullSavePath = fullSavePath.format(str(year))
+            print(self.fullSavePath)
+        super().__init__(self.fullSavePath)
+        self.year = year
     
     async def scrape_table_to_df(self, url: str, limiter: AsyncLimiter) -> pd.DataFrame:
         async with limiter:
             browser = await launch()
             page = await browser.newPage()
-            await page.goto(url)
+            await page.goto(url, {'timeout' : 70000})
             await page.waitForSelector('table#roster')
             table_html = await page.evaluate(
                 '''() => document.querySelector('table#roster').outerHTML'''
@@ -107,29 +111,34 @@ class RosterImport(Importer):
         limiter = AsyncLimiter(20, 60)
         tasks = []
         for team in teams:
+            await asyncio.sleep(random.uniform(1, 3))
             endpoint = f'https://www.pro-football-reference.com/teams/{team.lower()}/{self.year}_roster.htm'        
             tasks.append(self.scrape_table_to_df(endpoint, limiter))
         return await asyncio.gather(*tasks)
     
     def doImport(self, save : bool = False) -> pd.DataFrame:
-        pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])][:3]
+        pfr_abbrv_list = [i.lower() for i in list(pd.read_csv('../../data/import/abbreviations.csv')['pfr'])][20:]
         rosters_2023 = asyncio.get_event_loop().run_until_complete(self.scrape_all_teams(pfr_abbrv_list))
         rosters_df = pd.concat(rosters_2023)
         if save:
-            self._save(rosters_df)
+            mode = 'w'; header = True
+            if os.path.exists(self.fullSavePath):
+                mode = 'a'
+                header = False
+            self._save(rosters_df, mode = mode, header = header)
         return rosters_df
         
 class ADPImport(Importer):
     def __init__(self, 
                  fullSavePath: str, 
-                 year = datetime.date.today().year, 
+                 year = thisFootballYear(), 
                  scoring_type: ScoringType = ScoringType.PPR):
         super().__init__(fullSavePath)
         self.year = year
         self.scoring_type = scoring_type
         
     def doImport(self, 
-                 files_loc: str = '../../data/research/historical_adp', 
+                 files_loc: str = '../../data/historical_adp', 
                  save: bool = False) -> pd.DataFrame:
         df_dict = self._import_adp_data(files_loc = files_loc)
         df = self._prep_adp_df(df_dict)
@@ -142,7 +151,8 @@ class ADPImport(Importer):
     def _import_adp_data(self, files_loc: str) -> Dict[str, pd.DataFrame]:
         # Source: https://fantasydata.com/nfl/adp - PPR
         df_dict = {}
-        for i in range(2014, self.year + 1):
+
+        for i in range(2014, self.year):
             cols = ["Name", "Team", "Position", "PositionRank", self.scoring_type.adp_column_name()]
             tmp= pd.read_csv(f'{files_loc}/{self.scoring_type.lower_name()}-adp-{i}.csv',
                             usecols = cols)
@@ -234,34 +244,29 @@ if __name__ == '__main__':
     # =======
     # Roster
     # =======
-    # roster_2023_pickle = '../../data/research/created/roster2023.p'
-    # pd.read_pickle(roster_2023_pickle)
-    roster_importer = RosterImport(year = 2023)
-    df_roster = roster_importer.doImport(save = True)
-    
-    print(df_roster)
+    # roster_importer = RosterImport('../../data/created/scraping/rosters{}.csv')
+    # df_roster = roster_importer.doImport(save = True)
+    # print(df_roster)
 
-    # # =======
-    # # ADP
-    # # =======
-    # adp_pickle = '../../data/research/created/adp_full.p'
-    # adp_pickle_nppr = '../../data/research/created/adp_nppr_full.p'
-    # pd.read_pickle(adp_pickle)
-    # pd.read_pickle(adp_pickle_nppr)
-    # # adp_ppr_importer = ADPImport(adp_pickle)
-    # # df_adp_ppr = adp_ppr_importer.doImport(save = True)
-    # # adp_nppr_importer = ADPImport(adp_pickle_nppr, scoring_type = ScoringType.NPPR)
-    # # df_adp_nppr = adp_nppr_importer.doImport(save = True)
+    # =======
+    # ADP
+    # =======
+    # adp_pickle = '../../data/created/adp_full.p'
+    # adp_pickle_nppr = '../../data/created/adp_nppr_full.p'
+    # adp_ppr_importer = ADPImport(adp_pickle)
+    # df_adp_ppr = adp_ppr_importer.doImport(save = True)
+    # adp_nppr_importer = ADPImport(adp_pickle_nppr, scoring_type = ScoringType.NPPR)
+    # df_adp_nppr = adp_nppr_importer.doImport(save = True)
 
-    # # =======
-    # # Points
-    # # =======
-    # points_pickle = '../../data/research/created/points.p'
+    # =======
+    # Points
+    # =======
+    points_pickle = '../../data/created/points.p'
     # pd.read_pickle(points_pickle)
-    # # pt_importer = PointsImport(points_pickle)
-    # # fpts_dict = pt_importer.doImport(save = True)
+    pt_importer = PointsImport(points_pickle)
+    fpts_dict = pt_importer.doImport(save = True)
     
-    # # New import on 8.31
-    # points_2000_2012_pickle = '../../data/research/created/points_2000_2012.p'
-    # # pt_importer1 = PointsImport(fullSavePath = points_2000_2012_pickle)
-    # # pt_importer1.doImport(save = True, start_year = 2000, end_year = 2013)
+    # New import on 8.31
+    points_2000_2012_pickle = '../../data/created/points_2000_2012.p'
+    # pt_importer1 = PointsImport(fullSavePath = points_2000_2012_pickle)
+    # pt_importer1.doImport(save = True, start_year = 2000, end_year = 2013)
