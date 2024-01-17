@@ -99,19 +99,39 @@ class RosterImport(Importer):
             page = await browser.newPage()
             await page.goto(url, {'timeout' : 70000})
             await page.waitForSelector('table#roster')
+            
+            # Select all td elements with a data-append-csv attribute
+            tds = await page.querySelectorAll('td[data-append-csv]')
+
+            # Extract the data-append-csv values and player names
+            player_data = {}
+            for td in tds:
+                data_append_csv = await page.evaluate('(element) => element.getAttribute("data-append-csv")', td)
+                player_name = await page.evaluate('(element) => element.querySelector("a").innerText', td)
+                # strip player name of text in parentheses (e.g. (R))
+                player_name = player_name.split('(')[0].strip()
+                player_data[player_name] = data_append_csv
+            
+            # Extract entire html table
             table_html = await page.evaluate(
                 '''() => document.querySelector('table#roster').outerHTML'''
             )
             await browser.close()
+
             df = pd.read_html(table_html)[0]
             df['tm'] = url.split('/')[4].lower()
+            df = df[df['No.'] != 'No.'].reset_index().drop('index', axis = 1).copy()
+            
+            # Convert player_data dict to a DataFrame and merge with df
+            player_df = pd.DataFrame(list(player_data.items()), columns=['Player', 'ID'])
+            df = pd.merge(df, player_df, on='Player', how='left')
             return df
     
     async def scrape_all_teams(self, teams: List[str]) -> List[pd.DataFrame]:
         limiter = AsyncLimiter(20, 60)
         tasks = []
         for team in teams:
-            await asyncio.sleep(random.uniform(1, 3))
+            # await asyncio.sleep(random.uniform(0.5, 2))
             endpoint = f'https://www.pro-football-reference.com/teams/{team.lower()}/{self.year}_roster.htm'        
             tasks.append(self.scrape_table_to_df(endpoint, limiter))
         return await asyncio.gather(*tasks)

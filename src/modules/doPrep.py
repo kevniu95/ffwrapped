@@ -264,6 +264,87 @@ class PointsDataset(Dataset):
         return df
 
 
+class ADPDataset(Dataset):
+    def __init__(self, 
+                 scoringType : ScoringType,
+                 sources : List[str] = None, 
+                 prepSteps : List[PreparationStep] = None):
+        super().__init__(sources, prepSteps)
+        self.scoringType = scoringType
+
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+        if prepSteps:
+            super().setDefaultPrepSteps(prepSteps)
+        prepSteps = [PreparationStep('Drop 2014 and 2015 from ADP', self._dropSmallerDatasets)]
+        return prepSteps
+    
+    def _dropSmallerDatasets(self, df : pd.DataFrame) -> pd.DataFrame:
+        return df[~df['Year'].isin([2014, 2015])]
+
+    def loadPickleDict(self) -> Dict[str, pd.DataFrame]:
+        pickleDict = {}
+        for source in self.sources:
+            if source.endswith('adp.p') or source.endswith('adp_full.p'):
+                pickleDict[ScoringType.PPR] = pd.read_pickle(source)
+            elif source.endswith('adp_nppr.p') or source.endswith('adp_nppr_full.p'):
+                pickleDict[ScoringType.NPPR] = pd.read_pickle(source)
+            else:
+                raise Exception("Only pickles with suffix 'adp.p' or 'adp_nppr.p' are acceptable right now!")
+        return pickleDict
+        
+    def loadData(self) -> pd.DataFrame:
+        pickleDict = self.loadPickleDict()
+        ppr_set = pickleDict[ScoringType.PPR]
+        nppr_set = pickleDict[ScoringType.NPPR]
+        if self.scoringType == ScoringType.PPR:
+            return ppr_set
+        elif self.scoringType == ScoringType.NPPR:
+            return nppr_set
+        elif self.scoringType == ScoringType.HPPR:
+            a = ppr_set.merge(nppr_set, on = ['Name','Year','Team','Position'], how = 'outer')
+            a['AverageDraftPositionHPPR'] = (a['AverageDraftPositionPPR'] + a['AverageDraftPosition']) / 2
+            return a[['Name','Year','Team','Position','AverageDraftPositionHPPR']]
+
+
+class RosterDataset(Dataset):
+    def __init__(self,
+                 sources : List[str],
+                 prepSteps: List[PreparationStep] = None,
+                 currentYear : int = thisFootballYear()):
+        super().__init__(sources)
+        self.currentYear = currentYear
+    
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+        if prepSteps:
+            super().setDefaultPrepSteps(prepSteps)
+        prepSteps = [PreparationStep('Fix team name abbreviations', self._getAbbreviation),
+                     PreparationStep('Mark rookies', self._markRookies)]
+        return prepSteps
+    
+    def loadData(self) -> pd.DataFrame:
+        dfs = []
+        for source in self.sources:
+            dfs.append(pd.read_csv(source))
+        df = pd.concat(dfs)
+        df.rename(columns = {'tm' : "Tm", 'ID' : 'pfref_id', 'Pos' : 'FantPos'}, inplace = True)
+        df['Year'] = self.currentYear
+        df['Player'] = df['Player'].str.replace(r'\(.*?\)', '', regex=True)
+        return df.loc[df['FantPos'].isin(['RB','TE','WR','QB']), ['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'Yrs','Drafted (tm/rnd/yr)']].copy()
+    
+    def _getAbbreviation(self, df : pd.DataFrame) -> pd.DataFrame:
+        abbr_df = pd.read_csv('../../data/import/abbreviations.csv')
+        mapping = dict(zip(abbr_df['pfr'].str.lower(), abbr_df['pfr_schedule']))
+        df['Tm'].replace(mapping, inplace= True)
+        return df
+    
+    def _markRookies(self, df : pd.DataFrame) -> pd.DataFrame:
+        df['rookie'] = np.where(df['Yrs'] == 'Rook', 1, 0)
+        df['draftPick'] = df['Drafted (tm/rnd/yr)'].str.split('/').str[2].str.extract(r'(\d+)')
+        df['draftPick'] = np.where(df['rookie'] == 1, df['draftPick'], np.nan)
+        df['Player']
+        return df[['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'rookie', 'draftPick']]
+
+
 if __name__ == '__main__':
     # pd.options.display.max_columns = None
     path = pathlib.Path(__file__).parent.resolve()
@@ -278,4 +359,20 @@ if __name__ == '__main__':
     points_sources = ['../../data/created/points.p']
     pointsDataset = PointsDataset(points_sources, SCORING, pc)
     pt = pointsDataset.performSteps()
-    print(pt)
+    # print(pt[pt['PrvYrPtsShare'].notnull()])
+    print(pt.columns)
+
+    # =======
+    # ADP
+    # =======
+    adp_sources = ['../../data/created/adp_full.p',
+                   '../../data/created/adp_nppr_full.p']
+    ad = ADPDataset(SCORING, adp_sources)
+    print(ad.performSteps())
+
+    # ======
+    # Roster
+    # ======
+    roster_source = '../../data/created/scraping/rosters2023.csv'
+    rd = RosterDataset([roster_source])
+    a = rd.performSteps()
