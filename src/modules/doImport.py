@@ -121,6 +121,8 @@ class RosterImport(Importer):
             df = pd.read_html(table_html)[0]
             df['tm'] = url.split('/')[4].lower()
             df = df[df['No.'] != 'No.'].reset_index().drop('index', axis = 1).copy()
+            # strip player name of text in parentheses (e.g. (R))
+            df['Player'] = df['Player'].str.split('(').str[0].str.strip()
             
             # Convert player_data dict to a DataFrame and merge with df
             player_df = pd.DataFrame(list(player_data.items()), columns=['Player', 'ID'])
