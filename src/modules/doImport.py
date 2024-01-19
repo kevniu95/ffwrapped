@@ -71,6 +71,7 @@ class PointsImport(Importer):
             df = pd.read_html(str(table), flavor = 'html5lib')[0]
             df.columns = df.columns.get_level_values(1)
             df['Year'] = i
+            df.loc[df['FantPos'] == 'FB', 'FantPos'] = 'RB' # Change FB to RB
             df = df[df['Rk'] != 'Rk'].reset_index().drop('index', axis = 1)
             
             # Add pfref identifier
@@ -275,9 +276,9 @@ if __name__ == '__main__':
     # =======
     # Roster
     # =======
-    roster_importer = RosterImport('../../data/created/scraping/rosters{}.csv')
-    df_roster = roster_importer.doImport(save = True)
-    print(df_roster)
+    # roster_importer = RosterImport('../../data/created/scraping/rosters{}.csv')
+    # df_roster = roster_importer.doImport(save = True)
+    # print(df_roster)
 
     # =======
     # ADP

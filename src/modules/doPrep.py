@@ -227,7 +227,6 @@ class PointsDataset(Dataset):
         age_df = age_df[['pfref_id','year_born']].drop_duplicates()
         merged = merged.merge(age_df, on ='pfref_id', how = 'left')
         merged['Age'] = merged['Year'] - merged['year_born']
-        print(merged.tail())
         return merged.drop('foundLastYearStats', axis = 1)
     
     def _create_qb_chg(self, df : pd.DataFrame) -> pd.DataFrame:

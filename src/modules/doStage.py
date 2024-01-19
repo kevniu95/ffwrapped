@@ -69,6 +69,8 @@ def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = Tru
 # Gets ADP Info on
 # =================
 def _getPtShare(df : pd.DataFrame, scoringType : ScoringType):
+    # Need to calculate these values for new players
+    # Just like we did for prvYear and other variables before this call
     df.drop('PrvYrTmPts', axis = 1, inplace = True)
     df.drop('PlayersAtPosition', axis = 1, inplace = True)
     scoring_var : str = scoringType.points_name()
@@ -79,7 +81,6 @@ def _getPtShare(df : pd.DataFrame, scoringType : ScoringType):
     df_tm = df_tm[df_tm['Tm'].str[-2:] != 'TM']
     
     df = df.merge(df_tm, on = ['Tm','FantPos','Year'], how = 'left')
-    print(df)
     df['PrvYrPtsShare'] = df[prv_scoring_var] / df['PrvYrTmPts'] 
     # Keeping in, because only real conflict with PrvYrTmPts and PrvPts_PPR is multicollinearity
     # df.loc[df['PrvYrPtsShare'].isnull(), 'PrvYrPtsShare'] = 1 / df.loc[df['PrvYrPtsShare'].isnull(), 'PlayersAtPosition']
@@ -109,11 +110,9 @@ def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType):
                         right_on = ['Name', 'Year', 'Position'],
                         how = 'outer',
                         indicator= 'foundAdp')
-    # print(test.groupby(['Year']))
-    # test['drafted'] = np.where(test['foundAdp'] == 'left_only', 0, 1)
-    # print(test.shape)
     
     # 2. Create previous year, fill out player name, position, team
+    # Filling data where only ADP info was available 
     test['PrvYear'] = test['Year'] - 1
     test['Player'].fillna(test['Name'], inplace=True)
     test.drop('Name',axis = 1, inplace= True)
@@ -206,18 +205,23 @@ def main():
     pc = PointsConverter(SCORING)
     points_sources = ['../../data/created/points.p']
     final_pts_df = PointsDataset(points_sources, SCORING, pc, currentRosterDf = final_roster_df).performSteps()
+    # print(final_pts_df[final_pts_df['Year'] > 2015].sample(50))
     
-    # # =======
-    # # ADP
-    # # =======
-    # adp_sources = ['../../data/research/created/adp_full.p',
-    #                '../../data/research/created/adp_nppr_full.p']
-    # final_adp_df = ADPDataset(SCORING, adp_sources).performSteps()
+    # =======
+    # ADP
+    # =======
+    adp_sources = ['../../data/created/adp_full.p',
+                   '../../data/created/adp_nppr_full.p']
+    final_adp_df = ADPDataset(SCORING, adp_sources).performSteps()
+    # print(final_adp_df.head())
     
-    # # =======
-    # # 
-    # # =======
-    # final_df = mergeAdpDataset(final_pts_df, final_adp_df, SCORING)
+    # =======
+    # 
+    # =======
+    final_df = mergeAdpDataset(final_pts_df, final_adp_df, SCORING)
+    # TODO: 2024.01.18 Just finished looking at this
+    # Pick up from here
+    print(final_df.head())
     # a = final_df[final_df['Year'] == 2023]
     # # print(a[a[SCORING.adp_column_name()].notnull()].sort_values(SCORING.adp_column_name()).head(50))
     # makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
