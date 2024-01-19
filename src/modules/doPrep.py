@@ -139,8 +139,17 @@ class PointsDataset(Dataset):
         return self.pointsConverter.calculate_points(dfDict)
 
     def _addCurrentRosters(self, df : pd.DataFrame) -> None:
-        # Not used currently
-        '''
+        """
+        Adds information about rookies from current year rosters
+        Outer merge may add new players
+        
+        Fill in following if new player 
+            1. Player 
+            2. Team
+            3. Fantasy Position
+
+        Also add rookie/draft info where applicable
+        """
         cols = list(df.columns) + ['rookie', 'draftPick']
         # Merge by pfref_id, fill in other info after
         merged = df.merge(self.currentRosterDf, on = ['pfref_id','Year'], how = 'outer')
@@ -150,11 +159,15 @@ class PointsDataset(Dataset):
         # Re-do changedTeam var for 2023 guys
         final_df['changedTeam'] = np.where((final_df['Tm'] == merged['PrvTm']) | (merged['PrvTm'].isnull()), 0, 1)
         return final_df
-        '''
-        return
-        
         
     def _createPreviousYear(self, pts_df_base : pd.DataFrame) -> pd.DataFrame:
+        """
+        Create dataframe with previous year statistics including
+            1. Previous year points
+            2. Previous year team
+            3. Previous year age
+            4. Team change flag and related variables
+        """
         scoring_var = self.scoringType.points_name()
         # 1. Create template
         predTemplate = pts_df_base[['Player', 'Tm', 'Age', 'FantPos', 'Year', 'pfref_id', scoring_var]]
@@ -214,9 +227,17 @@ class PointsDataset(Dataset):
         age_df = age_df[['pfref_id','year_born']].drop_duplicates()
         merged = merged.merge(age_df, on ='pfref_id', how = 'left')
         merged['Age'] = merged['Year'] - merged['year_born']
+        print(merged.tail())
         return merged.drop('foundLastYearStats', axis = 1)
     
     def _create_qb_chg(self, df : pd.DataFrame) -> pd.DataFrame:
+        """
+        Captures qb change info, like:
+            1. old QB points
+            2. new QB points
+            3. difference in points
+            4. flag for new QB
+        """
         scoring_var : str = self.scoringType.points_name()
         # Do this a new way: separately merge on last year's QB and then this year's QB
         qb_then = df.loc[df['FantPos'] == 'QB', ['Tm','Year', scoring_var]]
@@ -250,6 +271,13 @@ class PointsDataset(Dataset):
         return new_df
         
     def _getPtShare(self, df : pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate:
+            1. Previous year team points at position
+                i. Last year's points, aggregated over position players on this year's team
+            2. Number of players at position this year
+            3. Share of previous year points at position
+        """
         scoring_var : str = self.scoringType.points_name()
         prv_scoring_var = 'Prv' + scoring_var
         df['ones'] = 1

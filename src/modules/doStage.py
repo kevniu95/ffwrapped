@@ -187,7 +187,7 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame, scoring : ScoringType,
     return df
 
 def main():
-    # pd.options.display.max_columns = None
+    pd.options.display.max_columns = None
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     print("hello kevin")
@@ -197,15 +197,14 @@ def main():
     # ======
     # Roster
     # ======
-    roster_source = '../../data/scraping/rosters2023.csv'
+    roster_source = '../../data/created/scraping/rosters2023.csv'
     final_roster_df = RosterDataset([roster_source]).performSteps()
     
     # =======
     # Points
     # =======
     pc = PointsConverter(SCORING)
-    points_sources = ['../../data/research/created/points.p',
-                      '../../data/research/created/points_2000_2012.p']
+    points_sources = ['../../data/created/points.p']
     final_pts_df = PointsDataset(points_sources, SCORING, pc, currentRosterDf = final_roster_df).performSteps()
     
     # # =======
