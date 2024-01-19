@@ -56,7 +56,7 @@ class PointsImport(Importer):
                  link : str = PFR_LINK, 
                  save : bool = False, 
                  start_year :int = 2013, 
-                 end_year: int = None):
+                 end_year: int = None) -> Dict[int, pd.DataFrame]:
         if not end_year:
             end_year = self.year
         fpts_dict = {}

@@ -30,7 +30,7 @@ class PointsConverter():
                             '2PM' : 2,
                             '2PP' : 2}
 
-    def _score_row(self, row):
+    def _score_row(self, row : pd.Series) -> float:
         sum = 0.0
         for cat, score in self.score_dict.items():
             addval = float(row[cat]) * score
@@ -39,7 +39,7 @@ class PointsConverter():
 
     def calculate_points(self, 
                     fpts_dict : Dict[str, pd.DataFrame], 
-                    pfref_colNames : Dict[str, str] = PFREF_COL_NAMES):
+                    pfref_colNames : Dict[str, str] = PFREF_COL_NAMES) -> pd.DataFrame:
         # 1. Concatenate, rename cols, drop filler rows, reset index
         df = pd.concat(fpts_dict.values())
         df.columns = pfref_colNames
@@ -86,13 +86,13 @@ class Dataset(ABC):
         self.sources = sources
         self.prepSteps = self.setDefaultPrepSteps(prepSteps)
         
-    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             return prepSteps
         return []
     
     @abstractmethod
-    def loadData():
+    def loadData() -> pd.DataFrame:
         pass
 
     def performSteps(self) -> pd.DataFrame:
@@ -138,7 +138,7 @@ class PointsDataset(Dataset):
                 dfDict.update(pickle.load(handle))
         return self.pointsConverter.calculate_points(dfDict)
 
-    def _addCurrentRosters(self, df : pd.DataFrame):
+    def _addCurrentRosters(self, df : pd.DataFrame) -> None:
         # Not used currently
         '''
         cols = list(df.columns) + ['rookie', 'draftPick']
@@ -151,6 +151,7 @@ class PointsDataset(Dataset):
         final_df['changedTeam'] = np.where((final_df['Tm'] == merged['PrvTm']) | (merged['PrvTm'].isnull()), 0, 1)
         return final_df
         '''
+        return
         
         
     def _createPreviousYear(self, pts_df_base : pd.DataFrame) -> pd.DataFrame:
@@ -248,7 +249,7 @@ class PointsDataset(Dataset):
         new_df['noNewQb'] = np.where((new_df['Pts_HPPR_new_qb'].isnull()) & (new_df['Tm'].str[-2:] != 'TM'), 1 ,0)
         return new_df
         
-    def _getPtShare(self, df : pd.DataFrame):
+    def _getPtShare(self, df : pd.DataFrame) -> pd.DataFrame:
         scoring_var : str = self.scoringType.points_name()
         prv_scoring_var = 'Prv' + scoring_var
         df['ones'] = 1
@@ -272,7 +273,7 @@ class ADPDataset(Dataset):
         super().__init__(sources, prepSteps)
         self.scoringType = scoringType
 
-    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Drop 2014 and 2015 from ADP', self._dropSmallerDatasets)]
@@ -314,7 +315,7 @@ class RosterDataset(Dataset):
         super().__init__(sources)
         self.currentYear = currentYear
     
-    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Fix team name abbreviations', self._getAbbreviation),
