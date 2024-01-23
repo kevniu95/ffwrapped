@@ -35,7 +35,7 @@ class DraftPlayer(Player):
         super().__init__(id, name, position)
         self.drafted : bool = False
     
-    def wasDrafted(self):
+    def wasDrafted(self) -> bool:
         if self.drafted:
             print("Player was drafted")
         return self.drafted
@@ -58,9 +58,9 @@ class ADPPlayerPool(PlayerPool):
         self.scoringType = scoringType
             
 class Team():
-    def __init__(self, id, rosterConfig):
-        self.id : str = id
-        self.rosterConfig : Dict[str, int] = rosterConfig
+    def __init__(self, id : str, rosterConfig : Dict[str, int]):
+        self.id = id
+        self.rosterConfig = rosterConfig
         self.size : int = sum([v for v in rosterConfig.values()])
         self.roster : Dict[str, List[DraftPlayer]] = {k : [] for k in self.rosterConfig.keys()}
     
@@ -85,19 +85,18 @@ class Team():
     def _addPlayer(self, player : DraftPlayer, pos : str) -> None:
         self.roster[pos].append(player)
         
+    
     def addPlayer(self, player : DraftPlayer) -> bool:
         if self._completeRoster() or player.wasDrafted():
             return False
+        
         pos = player.position
-        if self._notFull(pos):
-            self._addPlayer(player, pos)
-            return True
-        elif pos in ['RB', 'TE', 'WR'] and self._notFull('FLEX'):
-            self._addPlayer(player, 'FLEX')
-            return True
-        elif self._notFull('BENCH'):
-            self._addPlayer(player, 'BENCH')
-            return True
+        positions_to_check = [pos, 'FLEX', 'BENCH'] if pos in ['RB', 'TE', 'WR'] else [pos, 'BENCH']
+        for position in positions_to_check:
+            if self._notFull(position):
+                self._addPlayer(player, position)
+                return True
+
         print(f"You cannot select {player.name}")
         return False
     
@@ -118,13 +117,13 @@ class Team():
     
     def selectFromPool(self, pool : ADPPlayerPool, pickNum : int, temperature : float) -> str:
         scoringType = pool.scoringType
-        positionsNeeded : Set[str ]= self.unfilledStarters
+        positionsNeeded : Set[str] = self.unfilledStarters
         pool_sub = pool.df[(pool.df['team'].isnull())].copy()
         
-        teamPickNum = pickNum//10 + 1
+        teamPickNum = pickNum // 10 + 1
         if len(positionsNeeded) == 0:
             pass
-        elif 12 > (teamPickNum) > 8:
+        elif 8 < (teamPickNum) < 12:
             for i in positionsNeeded:
                 pool_sub.loc[pool_sub['FantPos'] == i, scoringType.adp_column_name()] -= 2
         elif teamPickNum > 11 and len(positionsNeeded) > 0:
@@ -144,10 +143,11 @@ class Team():
         selectedRow = pool_sub.loc[pool_sub['pfref_id'] == selectedId]
         player = DraftPlayer(selectedRow['pfref_id'].item(), selectedRow['Player'].item(), selectedRow['FantPos'].item())
         if self.addPlayer(player):
-            pool.df.loc[pool.df['pfref_id'] == selectedId, 'team'] = self.id
-            pool.df.loc[pool.df['pfref_id'] == selectedId, 'pick'] = pickNum
+            pool.df.loc[pool.df['pfref_id'] == selectedId, ['team', 'pick']] = [self.id, pickNum]
+            # pool.df.loc[pool.df['pfref_id'] == selectedId, 'team'] = self.id
+            # pool.df.loc[pool.df['pfref_id'] == selectedId, 'pick'] = pickNum
     
-    def getRosterConfigOnePosition(self, pool_df : pd.DataFrame, position : str) -> Dict[str, Any]:
+    def _getRosterConfigOnePosition(self, pool_df : pd.DataFrame, position : str) -> Dict[str, Any]:
         df = pool_df.copy()
         teamId = self.id
         if position == 'FLEX':
@@ -191,7 +191,7 @@ class Team():
         else:
             pos_list = [position]
         for pos in pos_list:
-            row = self.getRosterConfigOnePosition(pool_df, pos)
+            row = self._getRosterConfigOnePosition(pool_df, pos)
             end_list.append(row)
         return end_list
         
@@ -199,7 +199,7 @@ class Team():
                            pool_df : pd.DataFrame, 
                            models : Dict[str, sklearn.pipeline.Pipeline],
                            remaining_picks : int,
-                            position : str = None)-> pd.DataFrame:
+                           position : str = None)-> pd.DataFrame:
         if len(remaining_picks) < 2:
             return pool_df
         this_pick = remaining_picks[0]
@@ -220,13 +220,13 @@ class Team():
                 base_vars = base_vars + ['B_pred_points', 'B_std_error']
 
             # Get current score at position
-            pos_row = self.getRosterConfigOnePosition(pool_df, position)
+            pos_row = self._getRosterConfigOnePosition(pool_df, position)
             df_extended = pd.DataFrame([pos_row], columns=pos_row.keys())
             base = model.predict(df_extended[base_vars])
             
             for num, row in pool_df.loc[(pool_df['FantPos'] == pos) & (pool_df['team'].isnull())].iterrows():
                 pool_df.loc[pool_df['pfref_id'] == row['pfref_id'], 'team'] = self.id
-                summary_row = self.getRosterConfigOnePosition(pool_df, pos)
+                summary_row = self._getRosterConfigOnePosition(pool_df, pos)
                 df_extended_new = pd.DataFrame([summary_row], columns=summary_row.keys())
                 a = model.predict(df_extended_new[base_vars])
                 pool_df.loc[pool_df['pfref_id'] == row['pfref_id'], 'team'] = np.nan

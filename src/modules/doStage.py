@@ -8,7 +8,7 @@ from .regression import *
 # =================
 # Actually merges ADP dataset - this should be updateable
 # =================
-def makeAdpRegDataset(scoring : ScoringType):
+def makeAdpRegDataset(scoring : ScoringType) -> pd.DataFrame:
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     adp_pickle = '../../data/research/created/adp.p'
@@ -68,7 +68,7 @@ def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = Tru
 # =================
 # Gets ADP Info on
 # =================
-def _getPtShare(df : pd.DataFrame, scoringType : ScoringType):
+def _getPtShare(df : pd.DataFrame, scoringType : ScoringType) -> pd.DataFrame:
     # Need to calculate these values for new players
     # Just like we did for prvYear and other variables before this call
     df.drop('PrvYrTmPts', axis = 1, inplace = True)
@@ -87,7 +87,7 @@ def _getPtShare(df : pd.DataFrame, scoringType : ScoringType):
     df.drop('ones', axis = 1, inplace = True)
     return df
 
-def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType):
+def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType) -> pd.DataFrame:
     # Objective of method: update player info on points side
     # pts_df_reg.loc[(pts_df_reg['Player'] == 'Terrelle Pryor') & (pts_df_reg['Age'] >= 26), 'FantPos'] = 'WR'
     pts_df_reg.loc[(pts_df_reg['Player'] == 'Danny Woodhead'), 'FantPos'] = 'RB'
@@ -130,7 +130,7 @@ def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType):
 def makeDatasetAfterBaseRegression_new(df : pd.DataFrame, 
                                        scoring : ScoringType, 
                                        save : bool, 
-                                       save_path : str = '../../data/created/reg_w_preds_1.p'):
+                                       save_path : str = '../../data/created/reg_w_preds_1.p') -> pd.DataFrame:
     # Remove those with ADP but no stats for that year (really big outliers)
     # Holdouts, big injuries, off-the-field issues
     # e.g., Le'Veon Bell, Ray Rice, Josh Gordon

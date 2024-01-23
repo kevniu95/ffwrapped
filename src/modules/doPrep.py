@@ -121,7 +121,7 @@ class PointsDataset(Dataset):
             self.pointsConverter = PointsConverter(scoringType)
         super().__init__(sources, prepSteps)        
 
-    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]):
+    def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Get Previous Year Data', self._createPreviousYear)]
