@@ -309,7 +309,7 @@ class ADPDataset(Dataset):
     def _dropSmallerDatasets(self, df : pd.DataFrame) -> pd.DataFrame:
         return df[~df['Year'].isin([2014, 2015])]
 
-    def loadPickleDict(self) -> Dict[str, pd.DataFrame]:
+    def _loadPickleDict(self) -> Dict[str, pd.DataFrame]:
         pickleDict = {}
         for source in self.sources:
             if source.endswith('adp.p') or source.endswith('adp_full.p'):
@@ -321,7 +321,7 @@ class ADPDataset(Dataset):
         return pickleDict
         
     def loadData(self) -> pd.DataFrame:
-        pickleDict = self.loadPickleDict()
+        pickleDict = self._loadPickleDict()
         ppr_set = pickleDict[ScoringType.PPR]
         nppr_set = pickleDict[ScoringType.NPPR]
         if self.scoringType == ScoringType.PPR:

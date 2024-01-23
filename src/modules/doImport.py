@@ -2,7 +2,6 @@ import pathlib
 import os
 from typing import Dict, Any, List
 import datetime as datetime
-import random
 import time
 import requests
 import pickle
@@ -94,7 +93,7 @@ class RosterImport(Importer):
         super().__init__(self.fullSavePath)
         self.year = year
     
-    async def scrape_table_to_df(self, url: str, limiter: AsyncLimiter) -> pd.DataFrame:
+    async def _scrape_table_to_df(self, url: str, limiter: AsyncLimiter) -> pd.DataFrame:
         async with limiter:
             browser = await launch()
             page = await browser.newPage()
@@ -130,17 +129,17 @@ class RosterImport(Importer):
             df = pd.merge(df, player_df, on='Player', how='left')
             return df
     
-    async def scrape_all_teams(self, teams: List[str]) -> List[pd.DataFrame]:
+    async def _scrape_all_teams(self, teams: List[str]) -> List[pd.DataFrame]:
         limiter = AsyncLimiter(20, 60)
         tasks = []
         for team in teams:
             # await asyncio.sleep(random.uniform(0.5, 2))
             endpoint = f'https://www.pro-football-reference.com/teams/{team.lower()}/{self.year}_roster.htm'        
-            tasks.append(self.scrape_table_to_df(endpoint, limiter))
+            tasks.append(self._scrape_table_to_df(endpoint, limiter))
         return await asyncio.gather(*tasks)
     
     def _saveChunkToRosterCsv(self, chunk: List[str], save: bool) -> None:
-        rosters_2023 = asyncio.get_event_loop().run_until_complete(self.scrape_all_teams(chunk))
+        rosters_2023 = asyncio.get_event_loop().run_until_complete(self._scrape_all_teams(chunk))
         rosters_df = pd.concat(rosters_2023)
         if save:
             mode = 'w'; header = True

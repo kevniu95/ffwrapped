@@ -1,0 +1,375 @@
+from .doPrep import *
+from .doStage import *
+from typing import List, Dict, Set
+import random
+from abc import ABC, abstractmethod
+
+'''
+Simulate fantasy football draft
+'''
+
+ROSTER_CONFIG_DEFAULT = {'QB' : 1,
+                        'RB' : 2,
+                        'WR' : 2,
+                        'FLEX' : 1,
+                        'TE' : 1,
+                        'D/ST' : 1,
+                        'K' : 1,
+                        'BENCH' : 7}
+    
+class Player():
+    def __init__(self, id, name, position):
+        self.id : str = id
+        self.name : str = name
+        self.position : str = position
+    
+    def __str__(self):
+        return self.name + ': ' + self.id
+
+    def __repr__(self):
+        return self.name + ': ' + self.id
+
+
+class DraftPlayer(Player):
+    def __init__(self, id, name, position):
+        super().__init__(id, name, position)
+        self.drafted : bool = False
+    
+    def wasDrafted(self):
+        if self.drafted:
+            print("Player was drafted")
+        return self.drafted
+
+class ADPDraftPlayer(DraftPlayer):
+    def __init__(self, id, name, position, adp):
+        super().__init__(id, name, position)
+        self.adp = adp
+
+class PlayerPool(ABC):
+    def __init__(self, available, unavailable):
+        pass
+        
+class ADPPlayerPool(PlayerPool):
+    '''
+    Player pool implemented as pandas dataframe with ADP
+    '''
+    def __init__(self, df : pd.DataFrame, scoringType : ScoringType):
+        self.df = df
+        self.scoringType = scoringType
+            
+class Team():
+    def __init__(self, id, rosterConfig):
+        self.id : str = id
+        self.rosterConfig : Dict[str, int] = rosterConfig
+        self.size : int = sum([v for v in rosterConfig.values()])
+        self.roster : Dict[str, List[DraftPlayer]] = {k : [] for k in self.rosterConfig.keys()}
+    
+    @property
+    def rosterSize(self) -> int:
+        return sum([len(v) for v in self.roster.values()])
+
+    @property
+    def unfilledStarters(self) -> Set[str]:
+        pos_set = {'QB', 'RB', 'WR', 'TE', 'FLEX'}
+        return {i for i in pos_set if self._notFull(i)}
+
+    def _completeRoster(self) -> bool:
+        if self.rosterSize >= self.size:
+            print("Roster is complete!")
+            return True
+        return False
+
+    def _notFull(self, pos : str) -> bool:
+        return len(self.roster[pos]) < self.rosterConfig[pos]
+    
+    def _addPlayer(self, player : DraftPlayer, pos : str) -> None:
+        self.roster[pos].append(player)
+        
+    def addPlayer(self, player : DraftPlayer) -> bool:
+        if self._completeRoster() or player.wasDrafted():
+            return False
+        pos = player.position
+        if self._notFull(pos):
+            self._addPlayer(player, pos)
+            return True
+        elif pos in ['RB', 'TE', 'WR'] and self._notFull('FLEX'):
+            self._addPlayer(player, 'FLEX')
+            return True
+        elif self._notFull('BENCH'):
+            self._addPlayer(player, 'BENCH')
+            return True
+        print(f"You cannot select {player.name}")
+        return False
+    
+    def removePlayer(self, id : str, pos : str) -> bool:
+        if self.rosterSize == 0:
+            return False
+        elif id in [i.id for i in self.roster[pos]]:
+            self.roster[pos] = self.roster[pos][:-1]
+            print(self.roster)
+            return True
+        elif id in [i.id for i in self.roster['BENCH']]:
+            self.roster['BENCH'] = self.roster[pos][:-1]
+            print(self.roster)
+            return True
+        else:
+            print("Couldn't find player on roster!")
+            return False
+    
+    def selectFromPool(self, pool : ADPPlayerPool, pickNum : int, temperature : float) -> str:
+        scoringType = pool.scoringType
+        positionsNeeded : Set[str ]= self.unfilledStarters
+        pool_sub = pool.df[(pool.df['team'].isnull())].copy()
+        
+        teamPickNum = pickNum//10 + 1
+        if len(positionsNeeded) == 0:
+            pass
+        elif 12 > (teamPickNum) > 8:
+            for i in positionsNeeded:
+                pool_sub.loc[pool_sub['FantPos'] == i, scoringType.adp_column_name()] -= 2
+        elif teamPickNum > 11 and len(positionsNeeded) > 0:
+            if 'FLEX' in positionsNeeded:
+                positionsNeeded.update(['RB','TE','WR'])
+            pool_sub = pool_sub.loc[pool_sub['FantPos'].isin(positionsNeeded)]
+        
+        if len(pool_sub) == 0:
+            print(positionsNeeded)
+
+        pool_sub = self._prepDf(pool_sub, temperature, scoringType)
+        selectedId = np.random.choice(pool_sub['pfref_id'], p = pool_sub['probabilities'])
+        return selectedId
+    
+    def finalizeSelection(self, selectedId : str, pool : ADPPlayerPool, pickNum : int) -> None:
+        pool_sub = pool.df[(pool.df['team'].isnull())].copy()
+        selectedRow = pool_sub.loc[pool_sub['pfref_id'] == selectedId]
+        player = DraftPlayer(selectedRow['pfref_id'].item(), selectedRow['Player'].item(), selectedRow['FantPos'].item())
+        if self.addPlayer(player):
+            pool.df.loc[pool.df['pfref_id'] == selectedId, 'team'] = self.id
+            pool.df.loc[pool.df['pfref_id'] == selectedId, 'pick'] = pickNum
+    
+    def getRosterConfigOnePosition(self, pool_df : pd.DataFrame, position : str) -> Dict[str, Any]:
+        df = pool_df.copy()
+        teamId = self.id
+        if position == 'FLEX':
+            temp_df = df[(df['team'] == teamId) & (df['FantPos'].isin(['RB','WR','TE']))].copy()
+            temp_df.sort_values(['pred'], ascending = False, inplace = True)
+            top_rbs = temp_df[temp_df['FantPos'] == 'RB'].head(2).index
+            top_wrs = temp_df[temp_df['FantPos'] == 'WR'].head(2).index
+            top_te = temp_df[temp_df['FantPos'] == 'TE'].head(1).index
+            temp_df.drop(index=top_rbs, inplace=True)
+            temp_df.drop(index=top_wrs, inplace=True)
+            temp_df.drop(index=top_te, inplace=True)
+            n_starters = 2
+        else:
+            temp_df = df[(df['team'] == teamId) & (df['FantPos'] == position)].copy()
+            n_starters = 2 if position in ['RB', 'WR','FLEX'] else 1
+        temp_df.reset_index(drop=True, inplace=True)
+        
+        top_players = temp_df.head(n_starters)
+        
+        num_others = len(temp_df) - n_starters
+        avg_pred_points_other = temp_df.iloc[n_starters:]['pred'].mean()
+        avg_std_error_other = temp_df.iloc[n_starters:]['var_pred'].mean()
+        
+        row = {
+            'team': teamId,
+            'FantPos': position,
+            'A_pred_points': top_players.loc[0, 'pred'] if 0 in top_players.index else 0,
+            'A_std_error': top_players.loc[0, 'var_pred'] if 0 in top_players.index else 10000,
+            'B_pred_points': top_players.loc[1, 'pred'] if 1 in top_players.index else 0,
+            'B_std_error': top_players.loc[1, 'var_pred'] if 1 in top_players.index else 10000,
+            'num_others': num_others,
+            'avg_pred_points_other': avg_pred_points_other if avg_pred_points_other is not np.nan else 0,
+            'avg_std_error_other': avg_std_error_other if avg_std_error_other is not np.nan else 10000,
+        }
+        return row
+    
+    def getRosterConfigOneTeam(self, pool_df : pd.DataFrame, position : str = None) -> List[Dict[str, Any]]:
+        end_list = []
+        if position is None:
+            pos_list = ['QB', 'RB', 'WR', 'TE', 'FLEX']
+        else:
+            pos_list = [position]
+        for pos in pos_list:
+            row = self.getRosterConfigOnePosition(pool_df, pos)
+            end_list.append(row)
+        return end_list
+        
+    def recalculate_values(self, 
+                           pool_df : pd.DataFrame, 
+                           models : Dict[str, sklearn.pipeline.Pipeline],
+                           remaining_picks : int,
+                            position : str = None)-> pd.DataFrame:
+        if len(remaining_picks) < 2:
+            return pool_df
+        this_pick = remaining_picks[0]
+        next_pick = remaining_picks[1]
+        if position is None:
+            pos_list = ['QB', 'RB', 'WR', 'TE', 'FLEX']
+        else:
+            pos_list = [position]
+        for pos in pos_list:
+            base_vars = ['A_pred_points',
+                'A_std_error',
+                'num_others',
+                'avg_pred_points_other',
+                'avg_std_error_other'
+                ]
+            model = models[pos]
+            if pos in['RB','WR']:
+                base_vars = base_vars + ['B_pred_points', 'B_std_error']
+
+            # Get current score at position
+            pos_row = self.getRosterConfigOnePosition(pool_df, position)
+            df_extended = pd.DataFrame([pos_row], columns=pos_row.keys())
+            base = model.predict(df_extended[base_vars])
+            
+            for num, row in pool_df.loc[(pool_df['FantPos'] == pos) & (pool_df['team'].isnull())].iterrows():
+                pool_df.loc[pool_df['pfref_id'] == row['pfref_id'], 'team'] = self.id
+                summary_row = self.getRosterConfigOnePosition(pool_df, pos)
+                df_extended_new = pd.DataFrame([summary_row], columns=summary_row.keys())
+                a = model.predict(df_extended_new[base_vars])
+                pool_df.loc[pool_df['pfref_id'] == row['pfref_id'], 'team'] = np.nan
+                pool_df.loc[pool_df['pfref_id'] == row['pfref_id'], 'valueAdd'] = a - base
+        
+        sub = pool_df[pool_df['team'].isnull()].reset_index().drop('index', axis = 1)
+        picks_to_wait = next_pick - this_pick
+        remainers = sub.iloc[picks_to_wait:]
+        top_n = remainers.groupby('FantPos', group_keys=False).apply(lambda x: x.head(3)).reset_index(drop=True)
+        base = top_n[['FantPos','valueAdd','pred']].groupby('FantPos').mean().reset_index()
+        base.rename(columns = {'valueAdd': "valueAdd_base", 'pred' : 'pred_base'}, inplace = True)
+        
+        if 'valueAdd_base' in pool_df.columns:
+            print("Dropping columns...")
+            pool_df.drop(['valueAdd_base', 'pred_base'], axis = 1, inplace = True)
+        pool_df = pool_df.merge(base, on ='FantPos', how = 'left')
+        pool_df['valueAdd_diff'] = pool_df['valueAdd'] - pool_df['valueAdd_base']
+        pool_df['pred_diff'] = pool_df['pred'] - pool_df['pred_base']
+        return pool_df
+            # row = df[df['FantPos'] == pos]     
+            # a = model.predict(row[base_vars])
+            # print(a)
+        
+        
+    def _prepDf(self, df : pd.DataFrame, temperature : float, scoringType : ScoringType) -> pd.DataFrame:
+        MAX_ADP = 300
+        inverted_adp = MAX_ADP + 1 - df[scoringType.adp_column_name()]
+        probabilities = softmax(inverted_adp, temperature)
+        df['probabilities'] = probabilities
+        return df
+
+    def __str__(self) -> str:
+        return self.id
+    
+    def __repr__(self) -> str:
+        return self.id
+    
+class League():
+    def __init__(self, numTeams : int, rosterConfig : Dict[str, int] = None):
+        self.numTeams = numTeams
+        self.rosterConfig = rosterConfig
+        self.teams : Set[Team] = set([])
+        
+        if not self.numTeams:
+            self.numTeams = 10
+        if not self.rosterConfig:
+            self.rosterConfig = ROSTER_CONFIG_DEFAULT
+    
+    def initTeams(self):
+        # Will implement
+        pass
+
+    def initTeamsDefault(self):
+        self.teams = [Team('team_' + str(i + 1), self.rosterConfig) for i in range(10)]
+    
+    def getTeamFromId(self, id : str) -> Team:
+        team = [i for i in self.teams if i.id == id]
+        if len(team) == 0:
+            return None
+        return team[0]
+
+class Draft():
+    def __init__(self, pool : PlayerPool, league : League):
+        self.pool = pool
+        self.league = league
+        self.rounds = sum([v for v in self.league.rosterConfig.values()]) - 2
+
+class SnakeDraft(Draft):
+    def __init__(self, pool : PlayerPool, league : League):
+        super().__init__(pool, league)
+        self.draftOrder = None
+    
+    def getDraftOrder(self, shuffle : bool = True) -> List[Team]:
+        finalList = []
+        teamList = list(self.league.teams)
+        if shuffle:
+            random.shuffle(teamList)
+        if self.rounds % 2 == 1:
+            raise Exception(f"League configured with {self.rounds} odd number of roster spots, won't do snake draft")
+        for i in range(self.rounds // 2):
+            finalList.extend(teamList)
+            finalList.extend(teamList[::-1])
+        self.draftOrder = finalList
+        return finalList
+
+def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
+    x = x / T 
+    e_x = np.exp(x - np.max(x))  # prevent overflow with subtraction
+    return e_x / e_x.sum(axis=0)
+
+def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_compressed : bool = False) -> pd.DataFrame:
+    reg_df = loadDatasetAfterRegression(use_compressed=False)
+    reg_df = reg_df[(reg_df ['Year'] == year) 
+                    & (reg_df ['foundAdp'].isin(['left_only', 'both'])
+                    & (reg_df[scoringType.adp_column_name()].notnull()))].copy()
+    reg_df.sort_values([scoringType.adp_column_name()], inplace = True)
+    reg_df['Flex'] = np.where(reg_df['FantPos'].isin(['RB','TE','WR']), 1, 0)
+    reg_df['team'] = np.nan
+    reg_df['pick'] = np.nan
+    return reg_df
+
+def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) -> SnakeDraft:
+    league = League(10)
+    league.initTeamsDefault()
+
+    playerPoolDf = initPlayerPoolDfFromRegDataset(year, scoringType)
+    playerPool = ADPPlayerPool(playerPoolDf, scoringType)
+    snakeDraft = SnakeDraft(playerPool, league)
+    draftOrder = snakeDraft.getDraftOrder(shuffle = False)
+
+    for num, team in enumerate(draftOrder):
+        playerId : str = team.selectFromPool(snakeDraft.pool, num + 1, temp)
+        team.finalizeSelection(playerId, snakeDraft.pool, num + 1)
+    
+    return snakeDraft
+
+if __name__ == '__main__':
+    a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
+    base_vars = [
+                'Player',
+                'FantPos',
+                'Year',
+                'Age', 
+                 'adjYear', 
+                'drafted',
+                 'PrvYrTmPts',
+                 'PlayersAtPosition', 
+                 ScoringType.HPPR.adp_column_name(), 
+                 'QB',
+                 'RB',
+                 'TE',
+                 'WR',
+                 'pred'
+                 ]
+    print(a[base_vars].head(50))
+    # print(a)
+    # print(a.head(50))
+    # a = simulateLeagueAndDraft(2022, 4, ScoringType.HPPR)
+    # for team in a.league.teams:
+        # print(team.roster)
+    # print(a.pool.df)
+    # for team in a.league.teams:
+        # print(team.roster)
+    
+    # testList = [0.5, 0.75, 1, 1.5, 2, 3, 4]
+    # testList = [1.5, 1, 0.75]
