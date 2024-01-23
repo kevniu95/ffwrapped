@@ -211,12 +211,6 @@ def main():
     # 
     # =======
     final_df = mergeAdpDataset(final_pts_df, final_adp_df, SCORING)
-    
-    # TODO: 2024.01.18 Just finished looking at this
-    # Pick up from here
-    # print(final_df.head())
-    # a = final_df[final_df['Year'] == 2023]
-    # print(a[a[SCORING.adp_column_name()].notnull()].sort_values(SCORING.adp_column_name()).head(50))
     makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
 
 if __name__ == '__main__':
