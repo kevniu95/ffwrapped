@@ -60,7 +60,7 @@ class PointsImport(Importer):
         if not end_year:
             end_year = self.year
         fpts_dict = {}
-        for i in range(start_year, end_year):
+        for i in range(start_year, end_year + 1):
             print(i)
             use_link = link.format(yr = i)
             page = requests.get(use_link)
@@ -293,6 +293,6 @@ if __name__ == '__main__':
     # =======
     # Points
     # =======
-    # points_pickle = '../../data/created/points.p'
-    # pt_importer = PointsImport(points_pickle)
-    # fpts_dict = pt_importer.doImport(save = True)
+    points_pickle = '../../data/created/points.p'
+    pt_importer = PointsImport(points_pickle)
+    fpts_dict = pt_importer.doImport(save = True)

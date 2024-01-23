@@ -27,34 +27,34 @@ def makeAdpRegDataset(scoring : ScoringType):
 # Actually do regression 
 # NOTE: 8.31 - move this to staging area before real regressions
 # =================
-def makeDatasetAfterBaseRegression(reg_df : pd.DataFrame, save : bool = False, save_path : str = '../../data/research/created/reg_w_preds.p') -> pd.DataFrame:
-    base_vars = ['AverageDraftPositionPPR',
-                'AverageDraftPositionPPRSq',
-                'drafted',
-                # 'draftedBig',
-                # 'draftedSmall',
-                'QB','RB','TE','WR'
-                ]
-    reg_df['AverageDraftPositionPPRSq'] = reg_df['AverageDraftPositionPPR'] **2
-    reg_df = reg_df[(reg_df['Year'] > 2015) & (reg_df['Pts_PPR'].notnull())].copy()
-    reg_df['drafted'] = np.where(reg_df['foundAdp'] == 'left_only', False, True)
-    # Points regression
-    adp_pts_model_0 = split_and_try_model(reg_df, y_var = 'Pts_PPR', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
-    reg_df['pred'] = adp_pts_model_0.predict(reg_df[base_vars])
-    reg_df['var'] = reg_df['pred'] - reg_df['Pts_PPR']
-    reg_df['var2'] = (reg_df['pred'] - reg_df['Pts_PPR']) ** 2
+# def makeDatasetAfterBaseRegression(reg_df : pd.DataFrame, save : bool = False, save_path : str = '../../data/research/created/reg_w_preds.p') -> pd.DataFrame:
+#     base_vars = ['AverageDraftPositionPPR',
+#                 'AverageDraftPositionPPRSq',
+#                 'drafted',
+#                 # 'draftedBig',
+#                 # 'draftedSmall',
+#                 'QB','RB','TE','WR'
+#                 ]
+#     reg_df['AverageDraftPositionPPRSq'] = reg_df['AverageDraftPositionPPR'] **2
+#     reg_df = reg_df[(reg_df['Year'] > 2015) & (reg_df['Pts_PPR'].notnull())].copy()
+#     reg_df['drafted'] = np.where(reg_df['foundAdp'] == 'left_only', False, True)
+#     # Points regression
+#     adp_pts_model_0 = split_and_try_model(reg_df, y_var = 'Pts_PPR', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
+#     reg_df['pred'] = adp_pts_model_0.predict(reg_df[base_vars])
+#     reg_df['var'] = reg_df['pred'] - reg_df['Pts_PPR']
+#     reg_df['var2'] = (reg_df['pred'] - reg_df['Pts_PPR']) ** 2
 
-    # Variance regression
-    adp_var_model_0 = split_and_try_model(reg_df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR)
-    reg_df['var_pred'] = adp_var_model_0.predict(reg_df[base_vars])
+#     # Variance regression
+#     adp_var_model_0 = split_and_try_model(reg_df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR)
+#     reg_df['var_pred'] = adp_var_model_0.predict(reg_df[base_vars])
     
-    if save:
-        path = pathlib.Path(__file__).parent.resolve()
-        os.chdir(path)
-        reg_df.to_pickle(save_path)
-        reg_df_sub = reg_df[reg_df['AverageDraftPositionPPR'] < 350].copy()
-        reg_df_sub.to_pickle(re.sub(r'\.p$', '_compressed.p', save_path))    
-    return reg_df
+#     if save:
+#         path = pathlib.Path(__file__).parent.resolve()
+#         os.chdir(path)
+#         reg_df.to_pickle(save_path)
+#         reg_df_sub = reg_df[reg_df['AverageDraftPositionPPR'] < 350].copy()
+#         reg_df_sub.to_pickle(re.sub(r'\.p$', '_compressed.p', save_path))    
+#     return reg_df
 
 def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
     path = pathlib.Path(__file__).parent.resolve()
@@ -161,19 +161,7 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     og_df['var'] = og_df[scoring.points_name()] - og_df['pred']
     og_df['var2'] = og_df['var'] **2
     
-    df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')].copy()
-    base_vars = [
-                'Age', 
-                 'adjYear', 
-                'drafted',
-                 'PrvYrTmPts',
-                 scoring.adp_column_name(), 
-                 'QB',
-                 'RB',
-                 'TE',
-                 'WR',
-                 'pred'
-                 ]
+    base_vars.append('pred')
     var_model_0 = split_and_try_model(df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
     og_df['var_pred'] = var_model_0.predict(og_df[base_vars])
 
@@ -229,14 +217,7 @@ def main():
     # print(final_df.head())
     # a = final_df[final_df['Year'] == 2023]
     # print(a[a[SCORING.adp_column_name()].notnull()].sort_values(SCORING.adp_column_name()).head(50))
-    # makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
-
-    # # test = makeAdpRegDataset(ScoringType.PPR)
-    # # makeDatasetAfterBaseRegression(reg_df = test, save = False)
-    # # print(data_set['Pts_HPPR'].notnull().sum())
-    # # print(final_df[final_df['foundAdp'] == 'right_only'].sort_values(SCORING.adp_column_name()).head(50))
-    # # print(final_df[(final_df['foundAdp'] == 'left_only') & (final_df['Year'] > 2015)].sort_values(SCORING.points_name(), ascending = False).head(50))
-    
+    makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
 
 if __name__ == '__main__':
     main()
