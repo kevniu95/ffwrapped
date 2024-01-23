@@ -3,7 +3,7 @@ import os
 import re
 from .doImport import *
 from .doPrep import *
-
+from .regression import *
 
 # =================
 # Actually merges ADP dataset - this should be updateable
@@ -88,7 +88,7 @@ def _getPtShare(df : pd.DataFrame, scoringType : ScoringType):
     return df
 
 def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType):
-    # Update player info on points side
+    # Objective of method: update player info on points side
     # pts_df_reg.loc[(pts_df_reg['Player'] == 'Terrelle Pryor') & (pts_df_reg['Age'] >= 26), 'FantPos'] = 'WR'
     pts_df_reg.loc[(pts_df_reg['Player'] == 'Danny Woodhead'), 'FantPos'] = 'RB'
     pts_df_reg.loc[(pts_df_reg['Player'] == 'Ladarius Green'), 'FantPos'] = 'TE'
@@ -127,7 +127,10 @@ def mergeAdpDataset(pts_df_reg, adp_df, scoringType : ScoringType):
     # test[scoringType.adp_column_name()] = np.where((test[scoringType.adp_column_name()] > 400) | test[scoringType.adp_column_name()].isnull(), 400, test[scoringType.adp_column_name()])
     return test
 
-def makeDatasetAfterBaseRegression_new(df : pd.DataFrame, scoring : ScoringType, save : bool, save_path : str = '../../data/research/created/reg_w_preds_1.p'):
+def makeDatasetAfterBaseRegression_new(df : pd.DataFrame, 
+                                       scoring : ScoringType, 
+                                       save : bool, 
+                                       save_path : str = '../../data/created/reg_w_preds_1.p'):
     # Remove those with ADP but no stats for that year (really big outliers)
     # Holdouts, big injuries, off-the-field issues
     # e.g., Le'Veon Bell, Ray Rice, Josh Gordon
@@ -213,17 +216,19 @@ def main():
     adp_sources = ['../../data/created/adp_full.p',
                    '../../data/created/adp_nppr_full.p']
     final_adp_df = ADPDataset(SCORING, adp_sources).performSteps()
+    # print(final_adp_df[final_adp_df['Year'] == 2023])
     # print(final_adp_df.head())
     
     # =======
     # 
     # =======
     final_df = mergeAdpDataset(final_pts_df, final_adp_df, SCORING)
+    
     # TODO: 2024.01.18 Just finished looking at this
     # Pick up from here
-    print(final_df.head())
+    # print(final_df.head())
     # a = final_df[final_df['Year'] == 2023]
-    # # print(a[a[SCORING.adp_column_name()].notnull()].sort_values(SCORING.adp_column_name()).head(50))
+    # print(a[a[SCORING.adp_column_name()].notnull()].sort_values(SCORING.adp_column_name()).head(50))
     # makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
 
     # # test = makeAdpRegDataset(ScoringType.PPR)

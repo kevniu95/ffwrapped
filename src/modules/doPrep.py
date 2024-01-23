@@ -401,6 +401,6 @@ if __name__ == '__main__':
     # ======
     # Roster
     # ======
-    roster_source = '../../data/created/scraping/rosters2023.csv'
-    rd = RosterDataset([roster_source])
-    a = rd.performSteps()
+    # roster_source = '../../data/created/scraping/rosters2023.csv'
+    # rd = RosterDataset([roster_source])
+    # a = rd.performSteps()

@@ -184,7 +184,7 @@ class ADPImport(Importer):
         # Source: https://fantasydata.com/nfl/adp - PPR
         df_dict = {}
 
-        for i in range(2014, self.year):
+        for i in range(2014, self.year + 1):
             cols = ["Name", "Team", "Position", "PositionRank", self.scoring_type.adp_column_name()]
             tmp= pd.read_csv(f'{files_loc}/{self.scoring_type.lower_name()}-adp-{i}.csv',
                             usecols = cols)
