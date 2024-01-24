@@ -60,7 +60,7 @@ def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = Tru
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     if not df_path:
-        df_path = '../../data/research/created/reg_w_preds_1.p'
+        df_path = '../../data/created/reg_w_preds_1.p'
         if use_compressed:
             df_path = (re.sub(r'\.p$', '_compressed.p', df_path))        
     return pd.read_pickle(df_path)
@@ -161,7 +161,8 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     og_df['var'] = og_df[scoring.points_name()] - og_df['pred']
     og_df['var2'] = og_df['var'] **2
     
-    base_vars.append('pred')
+    df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')].copy()
+    base_vars = base_vars + ['pred']
     var_model_0 = split_and_try_model(df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
     og_df['var_pred'] = var_model_0.predict(og_df[base_vars])
 
@@ -211,7 +212,8 @@ def main():
     # 
     # =======
     final_df = mergeAdpDataset(final_pts_df, final_adp_df, SCORING)
-    makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
+    a = makeDatasetAfterBaseRegression_new(final_df, SCORING, save = False)
+    print(a.sample(50))
 
 if __name__ == '__main__':
     main()

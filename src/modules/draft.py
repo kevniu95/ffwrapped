@@ -319,6 +319,7 @@ def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
 
 def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_compressed : bool = False) -> pd.DataFrame:
     reg_df = loadDatasetAfterRegression(use_compressed=False)
+    # print(reg_df.sample(50))
     reg_df = reg_df[(reg_df ['Year'] == year) 
                     & (reg_df ['foundAdp'].isin(['left_only', 'both'])
                     & (reg_df[scoringType.adp_column_name()].notnull()))].copy()
@@ -344,24 +345,25 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
     return snakeDraft
 
 if __name__ == '__main__':
+    pd.options.display.max_columns = None
     a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
-    base_vars = [
-                'Player',
-                'FantPos',
-                'Year',
-                'Age', 
-                 'adjYear', 
-                'drafted',
-                 'PrvYrTmPts',
-                 'PlayersAtPosition', 
-                 ScoringType.HPPR.adp_column_name(), 
-                 'QB',
-                 'RB',
-                 'TE',
-                 'WR',
-                 'pred'
-                 ]
-    print(a[base_vars].head(50))
+    # base_vars = [
+    #             'Player',
+    #             'FantPos',
+    #             'Year',
+    #             'Age', 
+    #              'adjYear', 
+    #             'drafted',
+    #              'PrvYrTmPts',
+    #              'PlayersAtPosition', 
+    #              ScoringType.HPPR.adp_column_name(), 
+    #              'QB',
+    #              'RB',
+    #              'TE',
+    #              'WR',
+    #              'pred'
+    #              ]
+    # print(a[base_vars].head(50))
     # print(a)
     # print(a.head(50))
     # a = simulateLeagueAndDraft(2022, 4, ScoringType.HPPR)
