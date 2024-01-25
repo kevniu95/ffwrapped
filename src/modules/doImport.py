@@ -296,7 +296,7 @@ if __name__ == '__main__':
     # Roster
     # =======
     roster_importer = RosterImport('../../data/imports/created/rosters.p')
-    df_roster = roster_importer.doImport(start_year = 2023, save = True)
+    df_roster = roster_importer.doImport(start_year = 2019, end_year = 2019, save = True)
 
     # =======
     # ADP

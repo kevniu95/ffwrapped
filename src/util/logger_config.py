@@ -1,6 +1,6 @@
 import logging
 
-def setup_logger(name):
+def setup_logger(name, level: int = logging.INFO):
     formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(message)s')
 
     # Setting up the console handler

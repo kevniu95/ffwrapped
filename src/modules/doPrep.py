@@ -2,13 +2,17 @@ import os
 import pathlib
 from typing import List, Dict, Callable
 from abc import ABC, abstractmethod
+import logging
 
 import numpy as np
 import pandas as pd
 import pickle
 
-
 from ..domain.common import ScoringType, thisFootballYear
+from ..util.logger_config import setup_logger
+
+LOG_LEVEL = logging.INFO
+logger = setup_logger(__name__, level = LOG_LEVEL)
 
 PFREF_COL_NAMES = ['Rk', 'Player', 'Tm', 'FantPos', 'Age', 'G', 'GS', 'PassCmp', 'PassAtt', 'PassYds',
                     'PassTD', 'PassInt', 'RushAtt', 'RushYds', 'RushY/A', 'RushTD', 'RecTgt', 'Rec', 'RecYds', 'RecY/R',
@@ -96,10 +100,10 @@ class Dataset(ABC):
         pass
 
     def performSteps(self) -> pd.DataFrame:
-        print("\nLoading data from source...")
+        logger.info(f"Performing preparation steps on {self.__class__.__name__}")
         df = self.loadData()
         for step in self.prepSteps:
-            print(f"Performing step {step.name}")
+            logger.info(f"Performing step: {step.name}")
             df = step.execute(df)
         return df
 
@@ -162,24 +166,33 @@ class PointsDataset(Dataset):
         
     def _createPreviousYear(self, pts_df_base : pd.DataFrame) -> pd.DataFrame:
         """
-        Create dataframe with previous year statistics including
-            1. Previous year points
-            2. Previous year team
-            3. Previous year age
-            4. Team change flag and related variables
+        Initial fields:
+            1. Player
+            2. Team
+            3. Age
+            4. Fantasy Position
+            5. Year
+            6. pfref_id
+            7. Points
+        
+        Added fields:
+            1. Previous year team
+            2. Previous year age
+            3. Previous year
+            4. Previous year points
+            5. Missing last year flag
+            6. Team change flag
+            7. Year born
         """
         scoring_var = self.scoringType.points_name()
         # 1. Create template
         predTemplate = pts_df_base[['Player', 'Tm', 'Age', 'FantPos', 'Year', 'pfref_id', scoring_var]]
-        print(len(pts_df_base[pts_df_base['Year'] == 2022]))
+        # print(len(pts_df_base[pts_df_base['Year'] == 2022]))
         
-        print("1. This is the shape of og dataset...")
-        print(predTemplate)
-        print(predTemplate.shape)
+        if LOG_LEVEL == logging.DEBUG:
+            print(f"1. Shape of og dataset is: {predTemplate.shape}\n") 
         
         # 2. Merge on last year's results
-        # Change to only merge by pfref_id
-        # Add back ['Player', 'Tm', 'FantPos] via roster
         prvYr = predTemplate[['Tm', 'Age', 'Year', 'pfref_id', scoring_var]].copy()
         prvYr.rename(columns = {'Year' : 'PrvYear', 
                                 'Tm' : 'PrvTm', 
@@ -190,22 +203,29 @@ class PointsDataset(Dataset):
         prvYr['PrvAge'] = pd.to_numeric(prvYr['PrvAge'])
         merged = predTemplate.merge(prvYr, on = ['pfref_id', 'Year'], how = 'outer', indicator= 'foundLastYearStats')
         
-        print("2. This is the shape after doing outer join with previous years' data")
-        print(merged.shape)
-        print(merged['foundLastYearStats'].value_counts())
-
+        if LOG_LEVEL == logging.DEBUG:
+            print("2. This is the shape after doing outer join with previous years' data")
+            print(merged.shape)
+            print(merged['foundLastYearStats'].value_counts())
+            print()
+        
         # 3. Remove right_only obs that aren't from 2022
-        print(f"3. In total, {len(merged[merged['foundLastYearStats'] == 'right_only'])} observations are players with some data, "
-              + " but no previous year statistics")
-        print(f"-Of these, {len(merged[merged['PrvYear'] == (self.currentYear - 1)])} observations are associated" 
-              + "with year {self.currentYear}")
-        print("\t-These observations don't have a 'y-value' for regression, but this is the year we are trying to predict, so OK")
-        print(f"-Remove remaining {len(merged[(merged['PrvYear'] != (self.currentYear - 1)) & (merged['foundLastYearStats'] == 'right_only')])} observations")
-        print("\t-These observations don't have a 'y-value' for regression, only 'x-values', so ok to delete")
+            print(f"3. In total, {len(merged[merged['foundLastYearStats'] == 'right_only'])} observations are players with some data, "
+                + "but no previous year statistics")
+            print(f"-Of these, {len(merged[merged['PrvYear'] == (self.currentYear - 1)])} observations are associated" 
+                + f" with year {self.currentYear}")
+            print("\t-These observations don't have a 'y-value' for regression, but this is the year we are trying to predict, so OK to exclude")
+            print(f"-Remove remaining {len(merged[(merged['PrvYear'] != (self.currentYear - 1)) & (merged['foundLastYearStats'] == 'right_only')])} observations")
+            print("\t-These observations don't have a 'y-value' for regression, only 'x-values', so ok to delete")
+            print(f"-Note how that overall right-only minus {self.currentYear} right-only (shown below) yields number of removed observations above") 
+            print(merged.loc[merged['PrvYear'] == self.currentYear - 1, 'foundLastYearStats'].value_counts())
+            print()
+            
         merged = merged[(merged['Year'] == self.currentYear) | (merged['foundLastYearStats'] != 'right_only')]
-        print(merged[merged['foundLastYearStats'] == 'left_only'])   
-        print(merged.shape)
-        print()
+        if LOG_LEVEL == logging.DEBUG:
+            print(merged[merged['foundLastYearStats'] == 'left_only'])   
+            print(merged.shape)
+            print()
         
         # 4. Create found last year flag
         # This will help distinguish rookies and other players not in data
@@ -214,8 +234,9 @@ class PointsDataset(Dataset):
         # 5. Examine composition of remaining observations  
         # Left_only and both are needed for regression - excludes 2013 observations
         # Right_only needed for prediction - excludes non-2022 observations (right-only's in OG data)
-        print(merged['foundLastYearStats'].value_counts())
-        print()
+        if LOG_LEVEL == logging.DEBUG:
+            print(merged['foundLastYearStats'].value_counts())
+            print()
         merged['missingLastYear'] = np.where(merged['foundLastYearStats']=='left_only', 1, 0)
         merged['changedTeam'] = np.where((merged['Tm'] == merged['PrvTm']) | (merged['PrvTm'].isnull()), 0, 1)
         merged['Age'] = merged['PrvAge'] + 1
@@ -227,6 +248,8 @@ class PointsDataset(Dataset):
         age_df = age_df[['pfref_id','year_born']].drop_duplicates()
         merged = merged.merge(age_df, on ='pfref_id', how = 'left')
         merged['Age'] = merged['Year'] - merged['year_born']
+        if LOG_LEVEL == logging.DEBUG:
+            print(merged.head())
         return merged.drop('foundLastYearStats', axis = 1)
     
     def _create_qb_chg(self, df : pd.DataFrame) -> pd.DataFrame:
@@ -286,11 +309,8 @@ class PointsDataset(Dataset):
         
         df = df.merge(df_tm, on = ['Tm','FantPos','Year'], how = 'left')
         df['PrvYrPtsShare'] = df[prv_scoring_var] / df['PrvYrTmPts'] 
-        # Keeping in, because only real conflict with PrvYrTmPts and PrvPts_PPR is multicollinearity
-        # df.loc[df['PrvYrPtsShare'].isnull(), 'PrvYrPtsShare'] = 1 / df.loc[df['PrvYrPtsShare'].isnull(), 'PlayersAtPosition']
         df.drop('ones', axis = 1, inplace = True)
         return df
-
 
 class ADPDataset(Dataset):
     def __init__(self, 
@@ -333,7 +353,6 @@ class ADPDataset(Dataset):
             a['AverageDraftPositionHPPR'] = (a['AverageDraftPositionPPR'] + a['AverageDraftPosition']) / 2
             return a[['Name','Year','Team','Position','AverageDraftPositionHPPR']]
 
-
 class RosterDataset(Dataset):
     def __init__(self,
                  sources : List[str],
@@ -374,7 +393,7 @@ class RosterDataset(Dataset):
 
 
 if __name__ == '__main__':
-    # pd.options.display.max_columns = None
+    pd.options.display.max_columns = None
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
@@ -384,17 +403,15 @@ if __name__ == '__main__':
     # Points
     # =======
     pc = PointsConverter(SCORING)
-    points_sources = ['../../data/created/points.p']
+    points_sources = ['../../data/imports/created/points.p']
     pointsDataset = PointsDataset(points_sources, SCORING, pc)
     pt = pointsDataset.performSteps()
-    # print(pt[pt['PrvYrPtsShare'].notnull()])
-    print(pt.columns)
-
+    
     # =======
     # ADP
     # =======
-    adp_sources = ['../../data/created/adp_full.p',
-                   '../../data/created/adp_nppr_full.p']
+    adp_sources = ['../../data/imports/created/adp_full.p',
+                   '../../data/imports/created/adp_nppr_full.p']
     ad = ADPDataset(SCORING, adp_sources)
     print(ad.performSteps())
 
