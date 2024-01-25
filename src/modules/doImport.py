@@ -5,6 +5,7 @@ import datetime as datetime
 import time
 import requests
 import pickle
+import glob
 from websockets import client
 
 import pandas as pd
@@ -94,7 +95,7 @@ class RosterImport(Importer):
                  year = thisFootballYear()):
         self.fullSavePath = fullSavePath
         self.csvSavePath = fullSavePath.replace('.p', '{}.csv')
-        self.csvSavePath = self.csvSavePath.replace('/created', '/created/roster_csv/')
+        self.csvSavePath = self.csvSavePath.replace('/created', '/created/roster_csv')
         super().__init__(self.fullSavePath)
         self.year = year
     
@@ -173,7 +174,17 @@ class RosterImport(Importer):
         logger.info(f"Scraping rosters from {start_year} to {end_year}...")
         for i in range(start_year, end_year + 1):
             self.doImportYear(i, save)
-        final_df = pd.concat([pd.read_csv(self.csvSavePath.format(str(i))) for i in range(start_year, end_year + 1)])
+        
+        # Import all roster{year}.csv files and concatenate into one DataFrame
+        csv_folder = self.csvSavePath.replace('{}.csv', '')
+        csv_files = glob.glob(f'{csv_folder}*.csv')
+        df_list = []
+        for f in csv_files:
+            df = pd.read_csv(f)
+            df['Year'] = int(f.split('/')[-1].split('.')[0][-4:])
+            df_list.append(df)
+        final_df = pd.concat(df_list)
+        
         if save:
             self._save(final_df)
         return final_df
@@ -296,8 +307,8 @@ if __name__ == '__main__':
     # Roster
     # =======
     roster_importer = RosterImport('../../data/imports/created/rosters.p')
-    df_roster = roster_importer.doImport(start_year = 2019, end_year = 2019, save = True)
-
+    df_roster = roster_importer.doImport(start_year = 2019, end_year = 2018, save = True)
+    
     # =======
     # ADP
     # =======
