@@ -154,9 +154,12 @@ class PointsDataset(Dataset):
 
         Also add rookie/draft info where applicable
         """
-        cols = list(df.columns) + ['rookie', 'draftPick']
+
+        cols = list(df.columns) + ['rookie', 'draftPick', 'Yrs']
         # Merge by pfref_id, fill in other info after
         merged = df.merge(self.currentRosterDf, on = ['pfref_id','Year'], how = 'outer')
+        # print(merged.head())
+        # print(merged[merged['Player_x'] == 'John Kuhn'])
         for i in ['Player', 'Tm', 'FantPos']:
             merged[i] = merged[i + '_x'].fillna(merged[i + '_y'])
         final_df = merged[cols].copy()
@@ -304,11 +307,11 @@ class PointsDataset(Dataset):
         prv_scoring_var = 'Prv' + scoring_var
         df['ones'] = 1
         df_tm = df.groupby(['Tm','FantPos','Year'], as_index = False).sum()[['Tm','FantPos','Year', prv_scoring_var, 'ones']]
-        df_tm = df_tm.rename(columns = {prv_scoring_var : 'PrvYrTmPts', 'ones' : 'PlayersAtPosition'})
+        df_tm = df_tm.rename(columns = {prv_scoring_var : 'PrvYrTmPtsAtPosition', 'ones' : 'PlayersAtPosition'})
         df_tm = df_tm[df_tm['Tm'].str[-2:] != 'TM']
         
         df = df.merge(df_tm, on = ['Tm','FantPos','Year'], how = 'left')
-        df['PrvYrPtsShare'] = df[prv_scoring_var] / df['PrvYrTmPts'] 
+        df['PrvYrPtsShare'] = df[prv_scoring_var] / df['PrvYrTmPtsAtPosition'] 
         df.drop('ones', axis = 1, inplace = True)
         return df
 
@@ -358,14 +361,14 @@ class RosterDataset(Dataset):
                  sources : List[str],
                  prepSteps: List[PreparationStep] = None,
                  currentYear : int = thisFootballYear()):
-        super().__init__(sources)
+        super().__init__(sources, prepSteps)
         self.currentYear = currentYear
     
     def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Fix team name abbreviations', self._getAbbreviation),
-                     PreparationStep('Mark rookies', self._markRookies)]
+                     PreparationStep('Extract roster info', self._extractRosterInfo)]
         return prepSteps
     
     def loadData(self) -> pd.DataFrame:
@@ -387,17 +390,17 @@ class RosterDataset(Dataset):
         df['Tm'].replace(mapping, inplace= True)
         return df
     
-    def _markRookies(self, df : pd.DataFrame) -> pd.DataFrame:
+    def _extractRosterInfo(self, df : pd.DataFrame) -> pd.DataFrame:
         """
         Calculate:
             1. Rookie flag
-            2. Draft pick (if rookie this year)
+            2. Draft pick
+            3. Extract years played
         """
         df['rookie'] = np.where(df['Yrs'] == 'Rook', 1, 0)
         df['draftPick'] = df['Drafted (tm/rnd/yr)'].str.split('/').str[2].str.extract(r'(\d+)')
-        df['draftPick'] = np.where(df['rookie'] == 1, df['draftPick'], np.nan)
-        return df[['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'rookie', 'draftPick']]
-
+        df['Yrs'] = df['Yrs'].replace('Rook', 0).astype(int)
+        return df[['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'rookie', 'draftPick','Yrs']]
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
@@ -406,13 +409,23 @@ if __name__ == '__main__':
 
     SCORING = ScoringType.HPPR
 
+    # ======
+    # Roster
+    # ======
+    roster_source = '../../data/imports/created/rosters.p'
+    rd = RosterDataset([roster_source])
+    rd_performed = rd.performSteps()
+    # print(a[a['Year'] == 2023])
+
     # =======
     # Points
     # =======
     pc = PointsConverter(SCORING)
     points_sources = ['../../data/imports/created/points.p']
-    pointsDataset = PointsDataset(points_sources, SCORING, pc)
-    pt = pointsDataset.performSteps()
+    a = pd.read_pickle(points_sources[0])
+    pointsDataset = PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
+
+    # print(pt[pt['Player'].str.contains('Beau')])
     # print(pt)
     
     # =======
@@ -423,15 +436,6 @@ if __name__ == '__main__':
     ad = ADPDataset(SCORING, adp_sources)
     adres = ad.performSteps()
     # print(adres)
-
-    # ======
-    # Roster
-    # ======
-    roster_source = '../../data/imports/created/rosters.p'
-    rd = RosterDataset([roster_source])
-    a = rd.performSteps()
-    # print(a)
-    # print(a[a['Year'] == 2023])
 
     # a = pd.read_pickle('../../data/imports/created/rosters.p')
     # print(a)
