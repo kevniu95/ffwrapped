@@ -142,13 +142,9 @@ class Team():
     
     def finalizeSelection(self, selectedId : str, pool : ADPPlayerPool, pickNum : int) -> None:
         selectedRow = pool.df.loc[pool.df['pfref_id'] == selectedId]
-        print(selectedRow)
-        
         player = DraftPlayer(selectedRow['pfref_id'].item(), selectedRow['Player'].item(), selectedRow['FantPos'].item())
         if self.addPlayer(player):
             pool.df.loc[pool.df['pfref_id'] == selectedId, ['team', 'pick']] = [self.id, pickNum]
-            # pool.df.loc[pool.df['pfref_id'] == selectedId, 'team'] = self.id
-            # pool.df.loc[pool.df['pfref_id'] == selectedId, 'pick'] = pickNum
     
     def _getRosterConfigOnePosition(self, pool_df : pd.DataFrame, position : str) -> Dict[str, Any]:
         """
@@ -252,10 +248,6 @@ class Team():
         pool_df['valueAdd_diff'] = pool_df['valueAdd'] - pool_df['valueAdd_base']
         pool_df['pred_diff'] = pool_df['pred'] - pool_df['pred_base']
         return pool_df
-            # row = df[df['FantPos'] == pos]     
-            # a = model.predict(row[base_vars])
-            # print(a)
-        
         
     def _prepDfProbs(self, df : pd.DataFrame, temperature : float, scoringType : ScoringType) -> pd.DataFrame:
         MAX_ADP = 300
@@ -290,10 +282,6 @@ class League():
     
     def getTeamFromId(self, id : str) -> Team:
         return self.teams[id]
-        # team = [i for i in self.teams if i.id == id]
-        # if len(team) == 0:
-        #     return None
-        # return team[0]
 
 class Draft():
     def __init__(self, pool : PlayerPool, league : League):
@@ -325,7 +313,7 @@ def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
     return e_x / e_x.sum(axis=0)
 
 def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_compressed : bool = False) -> pd.DataFrame:
-    reg_df = loadDatasetAfterRegression(use_compressed=use_compressed)
+    reg_df = loadDatasetAfterBaseRegression(use_compressed=use_compressed)
     # print(reg_df.sample(50))
     reg_df = reg_df[(reg_df ['Year'] == year) 
                     & (reg_df ['foundAdp'].isin(['left_only', 'both'])
@@ -354,36 +342,10 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
-    reg_df = loadDatasetAfterRegression(use_compressed = False)
+    reg_df = loadDatasetAfterBaseRegression(use_compressed = False)
     # print(reg_df[reg_df['Year'] == 2022])
     # print(reg_df['Year'].value_counts())
     # a = initPlayerPoolDfFromRegDataset(2022, ScoringType.HPPR, use_compressed = False)
     snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
-    # base_vars = [
-    #             'Player',
-    #             'FantPos',
-    #             'Year',
-    #             'Age', 
-    #              'adjYear', 
-    #             'drafted',
-    #              'PrvYrTmPts',
-    #              'PlayersAtPosition', 
-    #              ScoringType.HPPR.adp_column_name(), 
-    #              'QB',
-    #              'RB',
-    #              'TE',
-    #              'WR',
-    #              'pred'
-    #              ]
-    # print(a[base_vars].head(50))
-    # print(a)
-    # print(a.head(50))
-    # a = simulateLeagueAndDraft(2022, 4, ScoringType.HPPR)
     for team in snakeDraft.league.teams:
         print(team.roster)
-    # print(a.pool.df)
-    # for team in a.league.teams:
-        # print(team.roster)
-    
-    # testList = [0.5, 0.75, 1, 1.5, 2, 3, 4]
-    # testList = [1.5, 1, 0.75]

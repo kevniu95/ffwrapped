@@ -149,7 +149,7 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     return df
 
 # Load regression results
-def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
+def loadDatasetAfterBaseRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     if not df_path:
