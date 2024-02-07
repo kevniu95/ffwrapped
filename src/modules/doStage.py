@@ -142,9 +142,8 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     if pos_sum.max() != pos_sum.min():
         raise Exception("Some player has been assigned to too many or too few positions!")
     
-    # print(og_df.loc[og_df['adjYear'] == 8, ['Player', 'FantPos', 'PrvPts_HPPR', 'AverageDraftPositionHPPR','pred','var_pred']].sort_values(scoring.adp_column_name()).head(50))
-    # og_df.loc[og_df['adjYear'] == 8].to_csv('test_a.csv')
     if save:
+        # Note: 350 is a cutoff for players who are not drafted
         og_df = og_df[og_df[scoring.adp_column_name()] < 350].copy()
         og_df.to_pickle(save_path)
     return df
@@ -154,7 +153,7 @@ def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = Tru
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     if not df_path:
-        df_path = '../../data/created/reg_w_preds_1.p'
+        df_path = '../../data/regression/reg_w_preds_1.p'
         if use_compressed:
             df_path = (re.sub(r'\.p$', '_compressed.p', df_path))        
     return pd.read_pickle(df_path)
@@ -181,6 +180,7 @@ def main():
     pc = PointsConverter(SCORING)
     points_sources = ['../../data/imports/created/points.p']
     final_pts_df = PointsDataset(points_sources, SCORING, pc, currentRosterDf = final_roster_df).performSteps()
+    
     # print(final_pts_df[final_pts_df['Pts_HPPR'].isnull() & (final_pts_df['Year'] < 2023)])
     # print(final_pts_df[final_pts_df['Year'] > 2015].sample(50))
     
@@ -196,11 +196,7 @@ def main():
     # =======
     # Stage
     # =======
-    print(final_pts_df.head())
-    print(final_pts_df[final_pts_df['Player'] == 'Gerald Hodges'])
     final_df = mergeAdpToPoints(final_pts_df, final_adp_df, SCORING)
-    print(final_df[['Year','foundAdp']].value_counts())
-    print(final_df.head())
     a = makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
     # print(a.sample(50))
 

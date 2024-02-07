@@ -351,8 +351,11 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
-    a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
-    print(a)
+    reg_df = loadDatasetAfterRegression(use_compressed = False)
+    # print(reg_df[reg_df['Year'] == 2022])
+    # print(reg_df['Year'].value_counts())
+    a = initPlayerPoolDfFromRegDataset(2022, ScoringType.HPPR, use_compressed = False)
+    # print(a)
     # base_vars = [
     #             'Player',
     #             'FantPos',

@@ -156,16 +156,16 @@ class PointsDataset(Dataset):
         """
 
         cols = list(df.columns) + ['rookie', 'draftPick', 'Yrs']
+
         # Merge by pfref_id, fill in other info after
         merged = df.merge(self.currentRosterDf, on = ['pfref_id','Year'], how = 'outer')
-        # print(merged.head())
         # print(merged[merged['Player_x'] == 'John Kuhn'])
         for i in ['Player', 'Tm', 'FantPos']:
             merged[i] = merged[i + '_x'].fillna(merged[i + '_y'])
         final_df = merged[cols].copy()
         # Re-do changedTeam var for 2023 guys
         final_df['changedTeam'] = np.where((final_df['Tm'] == merged['PrvTm']) | (merged['PrvTm'].isnull()), 0, 1)
-        return final_df
+        return final_df.drop_duplicates()
         
     def _createPreviousYear(self, pts_df_base : pd.DataFrame) -> pd.DataFrame:
         """
@@ -253,6 +253,7 @@ class PointsDataset(Dataset):
         merged['Age'] = merged['Year'] - merged['year_born']
         if LOG_LEVEL == logging.DEBUG:
             print(merged.head())
+        
         return merged.drop('foundLastYearStats', axis = 1)
     
     def _create_qb_chg(self, df : pd.DataFrame) -> pd.DataFrame:
@@ -400,7 +401,7 @@ class RosterDataset(Dataset):
         df['rookie'] = np.where(df['Yrs'] == 'Rook', 1, 0)
         df['draftPick'] = df['Drafted (tm/rnd/yr)'].str.split('/').str[2].str.extract(r'(\d+)')
         df['Yrs'] = df['Yrs'].replace('Rook', 0).astype(int)
-        return df[['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'rookie', 'draftPick','Yrs']]
+        return df[['Player', 'Tm', 'FantPos', 'Year', 'pfref_id', 'rookie', 'draftPick','Yrs']].drop_duplicates()
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
