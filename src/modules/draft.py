@@ -58,7 +58,7 @@ class ADPPlayerPool(PlayerPool):
         self.scoringType = scoringType
             
 class Team():
-    def __init__(self, id : str, rosterConfig : Dict[str, int]):
+    def __init__(self, id : str, rosterConfig : Dict[str, int] = ROSTER_CONFIG_DEFAULT):
         self.id = id
         self.rosterConfig = rosterConfig
         self.size : int = sum([v for v in rosterConfig.values()])
@@ -71,7 +71,7 @@ class Team():
     @property
     def unfilledStarters(self) -> Set[str]:
         pos_set = {'QB', 'RB', 'WR', 'TE', 'FLEX'}
-        return {i for i in pos_set if self._notFull(i)}
+        return {i for i in pos_set if self._hasRoomAtPosition(i)}
 
     def _completeRoster(self) -> bool:
         if self.rosterSize >= self.size:
@@ -79,13 +79,12 @@ class Team():
             return True
         return False
 
-    def _notFull(self, pos : str) -> bool:
+    def _hasRoomAtPosition(self, pos : str) -> bool:
         return len(self.roster[pos]) < self.rosterConfig[pos]
     
     def _addPlayer(self, player : DraftPlayer, pos : str) -> None:
         self.roster[pos].append(player)
         
-    
     def addPlayer(self, player : DraftPlayer) -> bool:
         if self._completeRoster() or player.wasDrafted():
             return False
@@ -93,7 +92,7 @@ class Team():
         pos = player.position
         positions_to_check = [pos, 'FLEX', 'BENCH'] if pos in ['RB', 'TE', 'WR'] else [pos, 'BENCH']
         for position in positions_to_check:
-            if self._notFull(position):
+            if self._hasRoomAtPosition(position):
                 self._addPlayer(player, position)
                 return True
 
@@ -101,6 +100,7 @@ class Team():
         return False
     
     def removePlayer(self, id : str, pos : str) -> bool:
+        # Assumes removed player is last player picked at his position
         if self.rosterSize == 0:
             return False
         elif id in [i.id for i in self.roster[pos]]:
@@ -115,18 +115,20 @@ class Team():
             print("Couldn't find player on roster!")
             return False
     
-    def selectFromPool(self, pool : ADPPlayerPool, pickNum : int, temperature : float) -> str:
+    def selectFromPool(self, pool : ADPPlayerPool, pickNum : int, temperature : float, numTeams: int = 10) -> str:
         scoringType = pool.scoringType
         positionsNeeded : Set[str] = self.unfilledStarters
         pool_sub = pool.df[(pool.df['team'].isnull())].copy()
         
-        teamPickNum = pickNum // 10 + 1
+        teamPickNum = pickNum // numTeams + 1
         if len(positionsNeeded) == 0:
             pass
         elif 8 < (teamPickNum) < 12:
+            # Force prioritization of still undrafted positions
             for i in positionsNeeded:
                 pool_sub.loc[pool_sub['FantPos'] == i, scoringType.adp_column_name()] -= 2
         elif teamPickNum > 11 and len(positionsNeeded) > 0:
+            # Force flex selection if not done by certain round
             if 'FLEX' in positionsNeeded:
                 positionsNeeded.update(['RB','TE','WR'])
             pool_sub = pool_sub.loc[pool_sub['FantPos'].isin(positionsNeeded)]
@@ -134,13 +136,12 @@ class Team():
         if len(pool_sub) == 0:
             print(positionsNeeded)
 
-        pool_sub = self._prepDf(pool_sub, temperature, scoringType)
+        pool_sub = self._prepDfProbs(pool_sub, temperature, scoringType)
         selectedId = np.random.choice(pool_sub['pfref_id'], p = pool_sub['probabilities'])
         return selectedId
     
     def finalizeSelection(self, selectedId : str, pool : ADPPlayerPool, pickNum : int) -> None:
-        pool_sub = pool.df[(pool.df['team'].isnull())].copy()
-        selectedRow = pool_sub.loc[pool_sub['pfref_id'] == selectedId]
+        selectedRow = pool.df.loc[pool.df['pfref_id'] == selectedId]
         player = DraftPlayer(selectedRow['pfref_id'].item(), selectedRow['Player'].item(), selectedRow['FantPos'].item())
         if self.addPlayer(player):
             pool.df.loc[pool.df['pfref_id'] == selectedId, ['team', 'pick']] = [self.id, pickNum]
@@ -148,6 +149,10 @@ class Team():
             # pool.df.loc[pool.df['pfref_id'] == selectedId, 'pick'] = pickNum
     
     def _getRosterConfigOnePosition(self, pool_df : pd.DataFrame, position : str) -> Dict[str, Any]:
+        """
+        1. Get summary stats for roster config at one position
+        2. These are later used as inputs in model based on roster composition of each team
+        """
         df = pool_df.copy()
         teamId = self.id
         if position == 'FLEX':
@@ -204,10 +209,9 @@ class Team():
             return pool_df
         this_pick = remaining_picks[0]
         next_pick = remaining_picks[1]
+        pos_list = [position]
         if position is None:
             pos_list = ['QB', 'RB', 'WR', 'TE', 'FLEX']
-        else:
-            pos_list = [position]
         for pos in pos_list:
             base_vars = ['A_pred_points',
                 'A_std_error',
@@ -251,7 +255,7 @@ class Team():
             # print(a)
         
         
-    def _prepDf(self, df : pd.DataFrame, temperature : float, scoringType : ScoringType) -> pd.DataFrame:
+    def _prepDfProbs(self, df : pd.DataFrame, temperature : float, scoringType : ScoringType) -> pd.DataFrame:
         MAX_ADP = 300
         inverted_adp = MAX_ADP + 1 - df[scoringType.adp_column_name()]
         probabilities = softmax(inverted_adp, temperature)
@@ -283,10 +287,11 @@ class League():
         self.teams = [Team('team_' + str(i + 1), self.rosterConfig) for i in range(10)]
     
     def getTeamFromId(self, id : str) -> Team:
-        team = [i for i in self.teams if i.id == id]
-        if len(team) == 0:
-            return None
-        return team[0]
+        return self.teams[id]
+        # team = [i for i in self.teams if i.id == id]
+        # if len(team) == 0:
+        #     return None
+        # return team[0]
 
 class Draft():
     def __init__(self, pool : PlayerPool, league : League):
@@ -318,7 +323,7 @@ def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
     return e_x / e_x.sum(axis=0)
 
 def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_compressed : bool = False) -> pd.DataFrame:
-    reg_df = loadDatasetAfterRegression(use_compressed=False)
+    reg_df = loadDatasetAfterRegression(use_compressed=use_compressed)
     # print(reg_df.sample(50))
     reg_df = reg_df[(reg_df ['Year'] == year) 
                     & (reg_df ['foundAdp'].isin(['left_only', 'both'])
@@ -347,6 +352,7 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
     a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
+    print(a)
     # base_vars = [
     #             'Player',
     #             'FantPos',

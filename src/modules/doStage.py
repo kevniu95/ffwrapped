@@ -75,17 +75,13 @@ def mergeAdpToPoints(pts_df_reg: pd.DataFrame, adp_df: pd.DataFrame, scoringType
                         left_on = ['Player','Year','FantPos'], 
                         right_on = ['Name', 'Year', 'Position'],
                         how = 'outer',
-                        indicator= 'foundAdp')
+                        indicator= 'foundAdp').copy()
     
     # 2. Create previous year, fill out player name, position, team
     # Filling data where only ADP info was available 
     merged['PrvYear'] = merged['Year'] - 1
-    merged['Player'].fillna(merged['Name'], inplace=True)
-    merged.drop('Name',axis = 1, inplace= True)
-    merged['FantPos'].fillna(merged['Position'], inplace=True)
-    merged.drop('Position',axis = 1, inplace= True)
-    merged['Tm'].fillna(merged['Team'], inplace = True)
-    merged.drop('Team', axis = 1, inplace= True)
+    merged.fillna({'Player' : merged['Name'], 'FantPos' : merged['Position'], 'Tm' : merged['Team']}, inplace = True)
+    merged.drop(['Name','Position','Team'], axis = 1, inplace = True)
 
     # 3. Create positional dummies
     merged[['QB','RB','TE','WR']] = pd.get_dummies(merged['FantPos'])
@@ -99,7 +95,7 @@ def mergeAdpToPoints(pts_df_reg: pd.DataFrame, adp_df: pd.DataFrame, scoringType
 def makeDatasetAfterBaseRegression_new(df : pd.DataFrame, 
                                        scoring : ScoringType, 
                                        save : bool, 
-                                       save_path : str = '../../data/created/reg_w_preds_1.p') -> pd.DataFrame:
+                                       save_path : str = '../../data/regression/reg_w_preds_1.p') -> pd.DataFrame:
     df['drafted'] = np.where(df['foundAdp'] == 'left_only', False, True)
     df[scoring.adp_column_name() + 'Sq'] = df[scoring.adp_column_name()] **2
     df['adjYear'] = df['Year'] - LAST_EXCLUDE_YEAR
@@ -111,15 +107,16 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     # Remove those with ADP but no stats for that year (really big outliers)
     # Holdouts, big injuries, off-the-field issues
     # e.g., Le'Veon Bell, Ray Rice, Josh Gordon
-    df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')].copy()
+    df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')
+               & (og_df['Year'] != 2023)].copy()
     df = df[df[scoring.points_name()].notnull()]
     df = df[df['rookie'].notnull()]
     df.loc[df['Age'].isnull(), 'Age'] = 23
-    print(df[df['PlayersAtPosition'].isnull()])
-    print(df[df['rookie'].isnull()])
 
     # Count null values for all columns in dataframe
-    print(df.isnull().sum())
+    # print(df.isnull().sum())
+    # print(df[df['PlayersAtPosition'].isnull()])
+    # print(df[df[scoring.points_name()].isnull()])  
 
     base_vars = ['Age', 
                  'adjYear', 
@@ -133,22 +130,24 @@ def makeDatasetAfterBaseRegression_new(df : pd.DataFrame,
     og_df['pred'] = pts_model_0.predict(og_df[base_vars])
     og_df['var'] = og_df[scoring.points_name()] - og_df['pred']
     og_df['var2'] = og_df['var'] **2
-    
-    # df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')].copy()
-    # base_vars = base_vars + ['pred']
-    # var_model_0 = split_and_try_model(df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
-    # og_df['var_pred'] = var_model_0.predict(og_df[base_vars])
 
-    # pos_sum = df['QB'].astype(int) + df['RB'].astype(int) + df['WR'].astype(int) + df['TE'].astype(int)
-    # if pos_sum.max() != pos_sum.min():
-    #     raise Exception("Some player has been assigned to too many or too few positions!")
+    df = og_df[(og_df['adjYear'] > 0) & (og_df['adjYear'] < 8) & (og_df['foundAdp']!= 'right_only')
+               & (og_df['Year'] != 2023)].copy()
+    df = df[df[scoring.points_name()].notnull()]
+    base_vars = base_vars + ['pred']
+    var_model_0 = split_and_try_model(df, y_var = 'var2', x_vars = base_vars, polys = 2, regressor = LASSO_CV_REGRESSOR) 
+    og_df['var_pred'] = var_model_0.predict(og_df[base_vars])
+
+    pos_sum = df['QB'].astype(int) + df['RB'].astype(int) + df['WR'].astype(int) + df['TE'].astype(int)
+    if pos_sum.max() != pos_sum.min():
+        raise Exception("Some player has been assigned to too many or too few positions!")
     
-    # # print(og_df.loc[og_df['adjYear'] == 8, ['Player', 'FantPos', 'PrvPts_HPPR', 'AverageDraftPositionHPPR','pred','var_pred']].sort_values(scoring.adp_column_name()).head(50))
+    # print(og_df.loc[og_df['adjYear'] == 8, ['Player', 'FantPos', 'PrvPts_HPPR', 'AverageDraftPositionHPPR','pred','var_pred']].sort_values(scoring.adp_column_name()).head(50))
     # og_df.loc[og_df['adjYear'] == 8].to_csv('test_a.csv')
-    # if save:
-    #     og_df = og_df[og_df[scoring.adp_column_name()] < 350].copy()
-    #     og_df.to_pickle(save_path)
-    # return df
+    if save:
+        og_df = og_df[og_df[scoring.adp_column_name()] < 350].copy()
+        og_df.to_pickle(save_path)
+    return df
 
 # Load regression results
 def loadDatasetAfterRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
@@ -202,7 +201,7 @@ def main():
     final_df = mergeAdpToPoints(final_pts_df, final_adp_df, SCORING)
     print(final_df[['Year','foundAdp']].value_counts())
     print(final_df.head())
-    a = makeDatasetAfterBaseRegression_new(final_df, SCORING, save = False)
+    a = makeDatasetAfterBaseRegression_new(final_df, SCORING, save = True)
     # print(a.sample(50))
 
 if __name__ == '__main__':
