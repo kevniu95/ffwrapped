@@ -388,7 +388,7 @@ class RosterDataset(Dataset):
         """
         abbr_df = pd.read_csv('../../data/imports/helpers/abbreviations.csv')
         mapping = dict(zip(abbr_df['pfr'].str.lower(), abbr_df['pfr_schedule']))
-        df['Tm'].replace(mapping, inplace= True)
+        df.replace({'Tm' : mapping}, inplace = True)
         return df
     
     def _extractRosterInfo(self, df : pd.DataFrame) -> pd.DataFrame:
@@ -435,7 +435,7 @@ if __name__ == '__main__':
     adp_sources = ['../../data/imports/created/adp_full.p',
                    '../../data/imports/created/adp_nppr_full.p']
     ad = ADPDataset(SCORING, adp_sources)
-    adres = ad.performSteps()
+    # adres = ad.performSteps()
     # print(adres)
 
     # a = pd.read_pickle('../../data/imports/created/rosters.p')

@@ -10,27 +10,6 @@ LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 # =================
-# Actually merges ADP dataset - this should be updateable
-# =================
-# Going to comment out and see if needed
-# TODO: delet this if it ends up being unnecessary
-
-# def makeAdpRegDataset(scoring : ScoringType) -> pd.DataFrame:
-#     path = pathlib.Path(__file__).parent.resolve()
-#     os.chdir(path)
-#     adp_pickle = '../../data/research/created/adp.p'
-#     points_pickle = '../../data/research/created/points.p'
-
-#     adp_df = pd.read_pickle(adp_pickle)
-#     with open(points_pickle, 'rb') as handle:
-#         points_df_dict = pickle.load(handle)
-
-#     pc = PointsConverter(ScoringType.PPR)
-#     points_df = pc.calculate_points(points_df_dict)
-    
-#     return mergeAdpToPoints(points_df, adp_df, scoring)
-
-# =================
 # Gets ADP Info on
 # =================
 def _getPtShare(df : pd.DataFrame, scoringType : ScoringType) -> pd.DataFrame:
@@ -202,4 +181,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
