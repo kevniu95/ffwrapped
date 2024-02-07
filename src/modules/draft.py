@@ -142,6 +142,8 @@ class Team():
     
     def finalizeSelection(self, selectedId : str, pool : ADPPlayerPool, pickNum : int) -> None:
         selectedRow = pool.df.loc[pool.df['pfref_id'] == selectedId]
+        print(selectedRow)
+        
         player = DraftPlayer(selectedRow['pfref_id'].item(), selectedRow['Player'].item(), selectedRow['FantPos'].item())
         if self.addPlayer(player):
             pool.df.loc[pool.df['pfref_id'] == selectedId, ['team', 'pick']] = [self.id, pickNum]
@@ -329,6 +331,7 @@ def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_com
                     & (reg_df ['foundAdp'].isin(['left_only', 'both'])
                     & (reg_df[scoringType.adp_column_name()].notnull()))].copy()
     reg_df.sort_values([scoringType.adp_column_name()], inplace = True)
+    reg_df.drop_duplicates(subset = 'pfref_id', keep = 'first', inplace = True)
     reg_df['Flex'] = np.where(reg_df['FantPos'].isin(['RB','TE','WR']), 1, 0)
     reg_df['team'] = np.nan
     reg_df['pick'] = np.nan
@@ -342,7 +345,7 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
     playerPool = ADPPlayerPool(playerPoolDf, scoringType)
     snakeDraft = SnakeDraft(playerPool, league)
     draftOrder = snakeDraft.getDraftOrder(shuffle = False)
-
+    
     for num, team in enumerate(draftOrder):
         playerId : str = team.selectFromPool(snakeDraft.pool, num + 1, temp)
         team.finalizeSelection(playerId, snakeDraft.pool, num + 1)
@@ -354,8 +357,8 @@ if __name__ == '__main__':
     reg_df = loadDatasetAfterRegression(use_compressed = False)
     # print(reg_df[reg_df['Year'] == 2022])
     # print(reg_df['Year'].value_counts())
-    a = initPlayerPoolDfFromRegDataset(2022, ScoringType.HPPR, use_compressed = False)
-    # print(a)
+    # a = initPlayerPoolDfFromRegDataset(2022, ScoringType.HPPR, use_compressed = False)
+    snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
     # base_vars = [
     #             'Player',
     #             'FantPos',
@@ -376,8 +379,8 @@ if __name__ == '__main__':
     # print(a)
     # print(a.head(50))
     # a = simulateLeagueAndDraft(2022, 4, ScoringType.HPPR)
-    # for team in a.league.teams:
-        # print(team.roster)
+    for team in snakeDraft.league.teams:
+        print(team.roster)
     # print(a.pool.df)
     # for team in a.league.teams:
         # print(team.roster)
