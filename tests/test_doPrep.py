@@ -24,7 +24,13 @@ def pointsDataset(rosterDataset: RosterDataset) -> PointsDataset:
     points_sources = ['../../data/imports/created/points.p']
     rd_performed = rosterDataset.performSteps()
     return PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
-    
+
+@pytest.fixture(scope='module')
+def adpDataset() -> ADPDataset:
+    adp_sources = ['../../data/imports/created/adp_full.p',
+                   '../../data/imports/created/adp_nppr_full.p']
+    return ADPDataset(SCORING, adp_sources) 
+
 # ========= 
 # Roster
 # ========= 
@@ -54,7 +60,6 @@ def test_points_loadData(pointsDataset: PointsDataset):
 def test_points_groupMultiTeamPlayers(pointsDataset: PointsDataset):
     og_df = pointsDataset.loadData()
     new_df = pointsDataset._groupMultiTeamPlayers(og_df)
-    print(new_df.shape)
     assert new_df.duplicated(['pfref_id','Year']).sum() == 0
     assert new_df.shape[0] <= og_df.shape[0]
 
@@ -69,7 +74,6 @@ def test_points_createPreviousYear(pointsDataset: PointsDataset):
     # Assert that all guys without PrvPts are properly marked as missingLastYear = 1
     assert new_df.loc[new_df['PrvPts_HPPR'].isnull(), 'missingLastYear'].mean() == 1
     outputSize = new_df.shape
-    logger.debug(f"\nDataset going in was of size: {inputSize}\nNew_dataset coming out is of size: {outputSize}")
 
 def test_points_addCurrentRosters(pointsDataset: PointsDataset):
     og_df = pointsDataset.loadData()
@@ -88,8 +92,23 @@ def test_points_performSteps(pointsDataset: PointsDataset):
 
     new_df = pointsDataset.performSteps()
 
+    # After adding current rosters, number of rows shouldn't change with subsequent steps
     assert og_df.shape[0] == new_df.shape[0]
     assert og_df.shape[1] < new_df.shape[1]
+    
+# ========= 
+# ADP
+# ========= 
+def test_adp_loadData(adpDataset: ADPDataset):
+    og_df = adpDataset.loadData()
+    assert og_df.drop_duplicates(['Name','Year','Team','Position']).shape[0] == og_df.shape[0]
+    assert list(og_df) == ['Name','Year','Team','Position','AverageDraftPositionHPPR']
+
+
+def test_adp_performSteps(adpDataset: ADPDataset):
+    og_df = adpDataset.loadData()
+    new_df = adpDataset.performSteps()
+    assert new_df.shape[0] < og_df.shape[0]
     
 def main():
     # test_roster_loadData()

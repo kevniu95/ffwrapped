@@ -11,7 +11,7 @@ import pickle
 from ..domain.common import ScoringType, thisFootballYear
 from ..util.logger_config import setup_logger
 
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 PFREF_COL_NAMES = ['Rk', 'Player', 'Tm', 'FantPos', 'Age', 'G', 'GS', 'PassCmp', 'PassAtt', 'PassYds',
@@ -63,7 +63,7 @@ class PointsConverter():
             assert len(df[(df['Pts_PPR'] - df['PPR']) > 0.1]) == 0
 
         # 4. Clean player names of '*' and '+'
-        df['Player'] = df['Player'].str.replace('[\*\+]', '', regex=True).str.strip()
+        df['Player'] = df['Player'].str.replace(r'[\*\+]', '', regex=True).str.strip()
 
         # 5. Limit to guys with positions, everyone without position: these guys always have 0 or less pts scored
         df = df[df['FantPos'].notnull()].copy()
@@ -377,7 +377,9 @@ class ADPDataset(Dataset):
         elif self.scoringType == ScoringType.HPPR:
             a = ppr_set.merge(nppr_set, on = ['Name','Year','Team','Position'], how = 'outer')
             a['AverageDraftPositionHPPR'] = (a['AverageDraftPositionPPR'] + a['AverageDraftPosition']) / 2
-            return a[['Name','Year','Team','Position','AverageDraftPositionHPPR']]
+            keep_cols = ['Name','Year','Team','Position','AverageDraftPositionHPPR']
+            a = a[keep_cols].groupby(['Name','Year','Team','Position'], as_index = False).mean()
+            return a[keep_cols]
 
 class RosterDataset(Dataset):
     def __init__(self,
