@@ -128,7 +128,8 @@ class PointsDataset(Dataset):
     def setDefaultPrepSteps(self, prepSteps : List[PreparationStep]) -> List[PreparationStep]:
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
-        prepSteps = [PreparationStep('Get Previous Year Data', self._createPreviousYear)]
+        prepSteps = [PreparationStep('Group Multi-Team Players', self._groupMultiTeamPlayers),
+            PreparationStep('Get Previous Year Data', self._createPreviousYear)]
         if self.currentRosterDf is not None:
             prepSteps.append(PreparationStep(f"Append {self.currentYear} roster to dataset", self._addCurrentRosters))
         prepSteps.extend([PreparationStep('Create QB Change Info', self._create_qb_chg),
@@ -142,6 +143,19 @@ class PointsDataset(Dataset):
                 dfDict.update(pickle.load(handle))
         return self.pointsConverter.calculate_points(dfDict)
 
+    def _groupMultiTeamPlayers(self, df : pd.DataFrame) -> pd.DataFrame:
+        df = df.sort_values(['pfref_id', 'Year', 'PPR'], ascending=[True, True, False])
+
+        def _aggregate_players(df):
+            # Create a flag for groups with more than one member
+            df['flag'] = df.groupby(['pfref_id', 'Year'])['Tm'].transform('size') > 1
+            # Modify 'Tm' based on the flag
+            df.loc[df['flag'], 'Tm'] = df.loc[df['flag'], 'Tm'] + 'TM'
+            # Drop duplicates based on 'pfref_id' and 'Year' to mimic selecting the first row
+            result = df.drop_duplicates(subset=['pfref_id', 'Year']).drop(columns=['flag'])
+            return result
+        return _aggregate_players(df)
+        
     def _addCurrentRosters(self, df : pd.DataFrame) -> None:
         """
         Adds information about rookies from current year rosters
@@ -425,7 +439,12 @@ if __name__ == '__main__':
     points_sources = ['../../data/imports/created/points.p']
     a = pd.read_pickle(points_sources[0])
     pointsDataset = PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
-
+    df = pointsDataset.loadData()
+    res = pointsDataset._groupMultiTeamPlayers(df)
+    print(df.shape)
+    print(res.shape)
+    # print(res.duplicated(['pfref_id','Year'], keep=False).sum())
+    
     # print(pt[pt['Player'].str.contains('Beau')])
     # print(pt)
     
