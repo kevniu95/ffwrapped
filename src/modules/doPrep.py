@@ -11,7 +11,7 @@ import pickle
 from ..domain.common import ScoringType, thisFootballYear
 from ..util.logger_config import setup_logger
 
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 PFREF_COL_NAMES = ['Rk', 'Player', 'Tm', 'FantPos', 'Age', 'G', 'GS', 'PassCmp', 'PassAtt', 'PassYds',
@@ -129,6 +129,7 @@ class PointsDataset(Dataset):
         if prepSteps:
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Group Multi-Team Players', self._groupMultiTeamPlayers),
+                     PreparationStep('Filter out predicted year from data', self._filterPredictYear),
             PreparationStep('Get Previous Year Data', self._createPreviousYear)]
         if self.currentRosterDf is not None:
             prepSteps.append(PreparationStep(f"Append {self.currentYear} roster to dataset", self._addCurrentRosters))
@@ -155,6 +156,9 @@ class PointsDataset(Dataset):
             result = df.drop_duplicates(subset=['pfref_id', 'Year']).drop(columns=['flag'])
             return result
         return _aggregate_players(df)
+    
+    def _filterPredictYear(self, df: pd.DataFrame) -> pd.DataFrame():
+        return df[df['Year'] != self.currentYear]
         
     def _addCurrentRosters(self, df : pd.DataFrame) -> None:
         """
@@ -221,6 +225,8 @@ class PointsDataset(Dataset):
         merged = predTemplate.merge(prvYr, on = ['pfref_id', 'Year'], how = 'outer', indicator= 'foundLastYearStats')
         
         if LOG_LEVEL == logging.DEBUG:
+            print(predTemplate.shape)
+            print(prvYr.shape)
             print("2. This is the shape after doing outer join with previous years' data")
             print(merged.shape)
             print(merged['foundLastYearStats'].value_counts())
@@ -234,15 +240,13 @@ class PointsDataset(Dataset):
             print("\t-These observations don't have a 'y-value' for regression, but this is the year we are trying to predict, so OK to exclude")
             print(f"-Remove remaining {len(merged[(merged['PrvYear'] != (self.currentYear - 1)) & (merged['foundLastYearStats'] == 'right_only')])} observations")
             print("\t-These observations don't have a 'y-value' for regression, only 'x-values', so ok to delete")
-            print(f"-Note how that overall right-only minus {self.currentYear} right-only (shown below) yields number of removed observations above") 
-            print(merged.loc[merged['PrvYear'] == self.currentYear - 1, 'foundLastYearStats'].value_counts())
+            print("The easiest way to look at this is as follows")
+            print("\t-All players-year observations prior to this predicted year are appended with previous year's if it's there")
+            print("\t-If previous year is not there, the player is still included")
+            print("\t-In addition to these players, we also add players for this predicted year, who will ONLY have previous year's data")
             print()
-            
+
         merged = merged[(merged['Year'] == self.currentYear) | (merged['foundLastYearStats'] != 'right_only')]
-        if LOG_LEVEL == logging.DEBUG:
-            print(merged[merged['foundLastYearStats'] == 'left_only'])   
-            print(merged.shape)
-            print()
         
         # 4. Create found last year flag
         # This will help distinguish rookies and other players not in data
@@ -252,6 +256,9 @@ class PointsDataset(Dataset):
         # Left_only and both are needed for regression - excludes 2013 observations
         # Right_only needed for prediction - excludes non-2022 observations (right-only's in OG data)
         if LOG_LEVEL == logging.DEBUG:
+            print(f"# players with both years' data:\n-{len(merged[merged['foundLastYearStats'] == 'both'])}")
+            print(f"# players with this year, not last year's data:\n-{len(merged[merged['foundLastYearStats'] == 'left_only'])}")
+            print(f"# players with last year, not this year's data (i.e., we predict this year):\n-{len(merged[merged['foundLastYearStats'] == 'right_only'])}")
             print(merged['foundLastYearStats'].value_counts())
             print()
         merged['missingLastYear'] = np.where(merged['foundLastYearStats']=='left_only', 1, 0)
@@ -441,8 +448,10 @@ if __name__ == '__main__':
     pointsDataset = PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
     df = pointsDataset.loadData()
     res = pointsDataset._groupMultiTeamPlayers(df)
-    print(df.shape)
-    print(res.shape)
+    res = pointsDataset._filterPredictYear(res, 2023)
+    res = pointsDataset._createPreviousYear(res)
+    # print(df.shape)
+    # print(res.shape)
     # print(res.duplicated(['pfref_id','Year'], keep=False).sum())
     
     # print(pt[pt['Player'].str.contains('Beau')])

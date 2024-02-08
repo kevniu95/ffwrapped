@@ -4,6 +4,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 import pytest
 from src.modules.doPrep import *
 from src.util.logger_config import setup_logger
+
+LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__)
 
 pd.options.display.max_columns = None
@@ -52,10 +54,26 @@ def test_points_loadData(pointsDataset: PointsDataset):
 def test_points_groupMultiTeamPlayers(pointsDataset: PointsDataset):
     og_df = pointsDataset.loadData()
     new_df = pointsDataset._groupMultiTeamPlayers(og_df)
+    print(new_df.shape)
     assert new_df.duplicated(['pfref_id','Year']).sum() == 0
     assert new_df.shape[0] <= og_df.shape[0]
 
+def test_points_createPreviousYear(pointsDataset: PointsDataset):
+    og_df = pointsDataset.loadData()
+    og_df = pointsDataset._groupMultiTeamPlayers(og_df)
+    og_df = pointsDataset._filterPredictYear(og_df)
+    inputSize = og_df.shape
+    new_df = pointsDataset._createPreviousYear(og_df)
+    # Assert only this predicted year doesn't have fantasy points
+    assert new_df.loc[new_df['Pts_HPPR'].isnull(), 'Year'].unique() == pointsDataset.currentYear
+    # Assert that all guys without PrvPts are properly marked as missingLastYear = 1
+    assert new_df.loc[new_df['PrvPts_HPPR'].isnull(), 'missingLastYear'].mean() == 1
+    outputSize = new_df.shape
+    logger.info(f"\nDataset going in was of size: {inputSize}\nNew_dataset coming out is of size: {outputSize}")
+    
+    
 def test_points_performSteps():
+
     pass
 
 def main():
