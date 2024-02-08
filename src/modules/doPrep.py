@@ -105,6 +105,7 @@ class Dataset(ABC):
         for step in self.prepSteps:
             logger.info(f"Performing step: {step.name}")
             df = step.execute(df)
+            # print(df.shape)
         return df
 
 class PointsDataset(Dataset):

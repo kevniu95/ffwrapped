@@ -69,13 +69,28 @@ def test_points_createPreviousYear(pointsDataset: PointsDataset):
     # Assert that all guys without PrvPts are properly marked as missingLastYear = 1
     assert new_df.loc[new_df['PrvPts_HPPR'].isnull(), 'missingLastYear'].mean() == 1
     outputSize = new_df.shape
-    logger.info(f"\nDataset going in was of size: {inputSize}\nNew_dataset coming out is of size: {outputSize}")
-    
-    
-def test_points_performSteps():
+    logger.debug(f"\nDataset going in was of size: {inputSize}\nNew_dataset coming out is of size: {outputSize}")
 
-    pass
+def test_points_addCurrentRosters(pointsDataset: PointsDataset):
+    og_df = pointsDataset.loadData()
+    og_df = pointsDataset._groupMultiTeamPlayers(og_df)
+    og_df = pointsDataset._filterPredictYear(og_df)
+    new_df = pointsDataset._createPreviousYear(og_df)
+    new_df = pointsDataset._addCurrentRosters(new_df)
+    assert new_df.drop_duplicates(['pfref_id','Year']).shape[0] == new_df.shape[0]  
+    
+def test_points_performSteps(pointsDataset: PointsDataset):
+    og_df = pointsDataset.loadData()
+    og_df = pointsDataset._groupMultiTeamPlayers(og_df)
+    og_df = pointsDataset._filterPredictYear(og_df)
+    og_df = pointsDataset._createPreviousYear(og_df)
+    og_df = pointsDataset._addCurrentRosters(og_df)
 
+    new_df = pointsDataset.performSteps()
+
+    assert og_df.shape[0] == new_df.shape[0]
+    assert og_df.shape[1] < new_df.shape[1]
+    
 def main():
     # test_roster_loadData()
     # test_roster_performSteps()
