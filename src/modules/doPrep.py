@@ -105,7 +105,6 @@ class Dataset(ABC):
         for step in self.prepSteps:
             logger.info(f"Performing step: {step.name}")
             df = step.execute(df)
-            # print(df.shape)
         return df
 
 class PointsDataset(Dataset):
@@ -131,7 +130,7 @@ class PointsDataset(Dataset):
             super().setDefaultPrepSteps(prepSteps)
         prepSteps = [PreparationStep('Group Multi-Team Players', self._groupMultiTeamPlayers),
                      PreparationStep('Filter out predicted year from data', self._filterPredictYear),
-            PreparationStep('Get Previous Year Data', self._createPreviousYear)]
+                     PreparationStep('Get Previous Year Data', self._createPreviousYear)]
         if self.currentRosterDf is not None:
             prepSteps.append(PreparationStep(f"Append {self.currentYear} roster to dataset", self._addCurrentRosters))
         prepSteps.extend([PreparationStep('Create QB Change Info', self._create_qb_chg),
@@ -184,6 +183,7 @@ class PointsDataset(Dataset):
         final_df = merged[cols].copy()
         # Re-do changedTeam var for 2023 guys
         final_df['changedTeam'] = np.where((final_df['Tm'] == merged['PrvTm']) | (merged['PrvTm'].isnull()), 0, 1)
+        final_df = final_df[final_df['Player'].notnull()]
         return final_df.drop_duplicates()
         
     def _createPreviousYear(self, pts_df_base : pd.DataFrame) -> pd.DataFrame:
@@ -375,11 +375,11 @@ class ADPDataset(Dataset):
         elif self.scoringType == ScoringType.NPPR:
             return nppr_set
         elif self.scoringType == ScoringType.HPPR:
-            a = ppr_set.merge(nppr_set, on = ['Name','Year','Team','Position'], how = 'outer')
-            a['AverageDraftPositionHPPR'] = (a['AverageDraftPositionPPR'] + a['AverageDraftPosition']) / 2
+            adp_merged = ppr_set.merge(nppr_set, on = ['Name','Year','Team','Position'], how = 'outer')
+            adp_merged['AverageDraftPositionHPPR'] = (adp_merged['AverageDraftPositionPPR'] + adp_merged['AverageDraftPosition']) / 2
             keep_cols = ['Name','Year','Team','Position','AverageDraftPositionHPPR']
-            a = a[keep_cols].groupby(['Name','Year','Team','Position'], as_index = False).mean()
-            return a[keep_cols]
+            adp_merged = adp_merged[keep_cols].groupby(['Name','Year','Team','Position'], as_index = False).mean()
+            return adp_merged[keep_cols]
 
 class RosterDataset(Dataset):
     def __init__(self,
@@ -439,7 +439,7 @@ if __name__ == '__main__':
     # ======
     roster_source = '../../data/imports/created/rosters.p'
     rd = RosterDataset([roster_source])
-    rd_performed = rd.performSteps()
+    # rd_performed = rd.performSteps()
     # print(a[a['Year'] == 2023])
 
     # =======
@@ -450,9 +450,9 @@ if __name__ == '__main__':
     a = pd.read_pickle(points_sources[0])
     pointsDataset = PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
     df = pointsDataset.loadData()
-    res = pointsDataset._groupMultiTeamPlayers(df)
-    res = pointsDataset._filterPredictYear(res, 2023)
-    res = pointsDataset._createPreviousYear(res)
+    # res = pointsDataset._groupMultiTeamPlayers(df)
+    # res = pointsDataset._filterPredictYear(res, 2023)
+    # res = pointsDataset._createPreviousYear(res)
     # print(df.shape)
     # print(res.shape)
     # print(res.duplicated(['pfref_id','Year'], keep=False).sum())

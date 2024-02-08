@@ -82,6 +82,7 @@ def test_points_addCurrentRosters(pointsDataset: PointsDataset):
     new_df = pointsDataset._createPreviousYear(og_df)
     new_df = pointsDataset._addCurrentRosters(new_df)
     assert new_df.drop_duplicates(['pfref_id','Year']).shape[0] == new_df.shape[0]  
+    assert new_df['Player'].isnull().sum() == 0
     
 def test_points_performSteps(pointsDataset: PointsDataset):
     og_df = pointsDataset.loadData()
