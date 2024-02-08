@@ -13,8 +13,6 @@ MODULE_DIR = "/Users/kniu91/Documents/kevins_folders/Projects/ffwrapped/src/modu
 SCORING = ScoringType.HPPR
 os.chdir(MODULE_DIR)
 
-
-
 @pytest.fixture(scope='module')
 def finalRosterDf() -> pd.DataFrame:
     roster_source = '../../data/imports/created/rosters.p'
@@ -34,11 +32,5 @@ def finalAdpDf() -> pd.DataFrame:
 
 def test_mergeAdpToPoints(finalPtsDf : pd.DataFrame, finalAdpDf : pd.DataFrame):
     df = mergeAdpToPoints(finalPtsDf, finalAdpDf, SCORING)
-    # count null values across three columns, Player, Tm, and FantPos, next line contains code
-    # df[['Player','Tm','FantPos']].isnull()
-    print(df[['Player','Tm','FantPos']].isnull().sum())
-    print(df[df['Player'].isnull()])
-    print(finalPtsDf[finalPtsDf['Player'].isnull()])
-
-    # assert df[['Player','Tm','FantPos']].isnull().sum().sum() == 0
+    assert df[['Player','Tm','FantPos']].isnull().sum().sum() == 0
     pass
