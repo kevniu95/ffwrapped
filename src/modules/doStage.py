@@ -49,6 +49,8 @@ def mergeAdpToPoints(pts_df_reg: pd.DataFrame, adp_df: pd.DataFrame, scoringType
     adp_df.loc[adp_df['Name'] == 'Brian Robinson', 'Name'] = 'Brian Robinson Jr.'
     adp_df.loc[adp_df['Name'] == 'Scotty Miller', 'Name'] = 'Scott Miller'
 
+    print(pts_df_reg.shape)
+    print(adp_df.shape)
     # 1. Merge with adp info
     merged = pts_df_reg.merge(adp_df[['Name', 'Year', 'Team', 'Position', scoringType.adp_column_name()]],
                         left_on = ['Player','Year','FantPos'], 
@@ -56,10 +58,14 @@ def mergeAdpToPoints(pts_df_reg: pd.DataFrame, adp_df: pd.DataFrame, scoringType
                         how = 'outer',
                         indicator= 'foundAdp').copy()
     
+    print(merged.head())
+    print(merged['foundAdp'].value_counts())
     # 2. Create previous year, fill out player name, position, team
     # Filling data where only ADP info was available 
     merged['PrvYear'] = merged['Year'] - 1
-    merged.fillna({'Player' : merged['Name'], 'FantPos' : merged['Position'], 'Tm' : merged['Team']}, inplace = True)
+    merged.fillna({'Player' : merged['Name'], 
+                   'FantPos' : merged['Position'], 
+                   'Tm' : merged['Team']}, inplace = True)
     merged.drop(['Name','Position','Team'], axis = 1, inplace = True)
 
     # 3. Create positional dummies
