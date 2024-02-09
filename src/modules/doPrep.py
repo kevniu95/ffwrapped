@@ -307,10 +307,10 @@ class PointsDataset(Dataset):
         qb_now = qb_now.rename(columns = {prv_scoring_var : scoring_var + '_new_qb'})
         qb_now = qb_now[qb_now['Tm'].str[-2:] != 'TM']
         new_df = new_df.merge(qb_now[['Tm','Year', scoring_var + '_new_qb']], 
-                            left_on = ['Tm','Year'], 
-                            right_on = ['Tm','Year'], 
-                            how = 'left',
-                            suffixes = [None, '_y'])
+                                left_on = ['Tm','Year'], 
+                                right_on = ['Tm','Year'], 
+                                how = 'left',
+                                suffixes = [None, '_y'])
         
         new_df['qb_diff'] = new_df[scoring_var + "_new_qb"] - new_df[scoring_var + "_old_qb"]
 

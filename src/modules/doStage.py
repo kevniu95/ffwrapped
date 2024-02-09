@@ -28,15 +28,12 @@ def _getPtShare(df : pd.DataFrame, scoringType : ScoringType) -> pd.DataFrame:
     
     df = df.merge(df_tm, on = ['Tm','FantPos','Year'], how = 'left')
     df['PrvYrPtsShare'] = df[prv_scoring_var] / df['PrvYrTmPtsAtPosition'] 
-    # Keeping in, because only real conflict with PrvYrTmPts and PrvPts_PPR is multicollinearity
-    # df.loc[df['PrvYrPtsShare'].isnull(), 'PrvYrPtsShare'] = 1 / df.loc[df['PrvYrPtsShare'].isnull(), 'PlayersAtPosition']
     df.drop('ones', axis = 1, inplace = True)
     return df
 
 def mergeAdpToPoints(pts_df_reg: pd.DataFrame, adp_df: pd.DataFrame, scoringType : ScoringType) -> pd.DataFrame:
     logger.info("Merging ADP Dataset to Points Dataset" )
     # Objective of method: update player info on points side
-    # pts_df_reg.loc[(pts_df_reg['Player'] == 'Terrelle Pryor') & (pts_df_reg['Age'] >= 26), 'FantPos'] = 'WR'
     pts_df_reg.loc[(pts_df_reg['Player'] == 'Danny Woodhead'), 'FantPos'] = 'RB'
     pts_df_reg.loc[(pts_df_reg['Player'] == 'Ladarius Green'), 'FantPos'] = 'TE'
 
