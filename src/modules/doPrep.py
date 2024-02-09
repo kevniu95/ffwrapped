@@ -441,7 +441,7 @@ if __name__ == '__main__':
     # ======
     roster_source = '../../data/imports/created/rosters.p'
     rd = RosterDataset([roster_source])
-    # rd_performed = rd.performSteps()
+    rd_performed = rd.performSteps()
     # print(a[a['Year'] == 2023])
 
     # =======
@@ -452,15 +452,6 @@ if __name__ == '__main__':
     a = pd.read_pickle(points_sources[0])
     pointsDataset = PointsDataset(points_sources, SCORING, pc, currentRosterDf= rd_performed)
     df = pointsDataset.loadData()
-    # res = pointsDataset._groupMultiTeamPlayers(df)
-    # res = pointsDataset._filterPredictYear(res, 2023)
-    # res = pointsDataset._createPreviousYear(res)
-    # print(df.shape)
-    # print(res.shape)
-    # print(res.duplicated(['pfref_id','Year'], keep=False).sum())
-    
-    # print(pt[pt['Player'].str.contains('Beau')])
-    # print(pt)
     
     # =======
     # ADP
@@ -469,7 +460,3 @@ if __name__ == '__main__':
                    '../../data/imports/created/adp_nppr_full.p']
     ad = ADPDataset(SCORING, adp_sources)
     # adres = ad.performSteps()
-    # print(adres)
-
-    # a = pd.read_pickle('../../data/imports/created/rosters.p')
-    # print(a)
