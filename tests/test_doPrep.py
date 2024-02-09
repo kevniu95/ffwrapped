@@ -103,13 +103,15 @@ def test_points_performSteps(pointsDataset: PointsDataset):
 def test_adp_loadData(adpDataset: ADPDataset):
     og_df = adpDataset.loadData()
     assert og_df.drop_duplicates(['Name','Year','Team','Position']).shape[0] == og_df.shape[0]
-    assert list(og_df) == ['Name','Year','Team','Position','AverageDraftPositionHPPR']
+    assert list(og_df) == ['Name','Year','Team','Position',SCORING.adp_column_name()]
+    assert og_df[SCORING.adp_column_name()].isnull().sum() == 0
 
 
 def test_adp_performSteps(adpDataset: ADPDataset):
     og_df = adpDataset.loadData()
     new_df = adpDataset.performSteps()
     assert new_df.shape[0] < og_df.shape[0]
+    assert og_df[SCORING.adp_column_name()].isnull().sum() == 0
     
 def main():
     # test_roster_loadData()
@@ -118,4 +120,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

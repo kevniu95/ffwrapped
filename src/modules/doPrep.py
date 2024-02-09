@@ -376,7 +376,9 @@ class ADPDataset(Dataset):
             return nppr_set
         elif self.scoringType == ScoringType.HPPR:
             adp_merged = ppr_set.merge(nppr_set, on = ['Name','Year','Team','Position'], how = 'outer')
-            adp_merged['AverageDraftPositionHPPR'] = (adp_merged['AverageDraftPositionPPR'] + adp_merged['AverageDraftPosition']) / 2
+            
+            adp_merged['AverageDraftPositionHPPR'] = (adp_merged['AverageDraftPositionPPR'].fillna(adp_merged['AverageDraftPosition']) 
+                                                      + adp_merged['AverageDraftPosition'].fillna(adp_merged['AverageDraftPositionPPR'])) / 2
             keep_cols = ['Name','Year','Team','Position','AverageDraftPositionHPPR']
             adp_merged = adp_merged[keep_cols].groupby(['Name','Year','Team','Position'], as_index = False).mean()
             return adp_merged[keep_cols]

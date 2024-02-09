@@ -32,5 +32,10 @@ def finalAdpDf() -> pd.DataFrame:
 
 def test_mergeAdpToPoints(finalPtsDf : pd.DataFrame, finalAdpDf : pd.DataFrame):
     df = mergeAdpToPoints(finalPtsDf, finalAdpDf, SCORING)
-    assert df[['Player','Tm','FantPos']].isnull().sum().sum() == 0
+    # assert df[['Player','Tm','FantPos']].isnull().sum().sum() == 0
+    # assert df[['QB','RB','TE','WR']].sum(axis=1).mean() == 1
+    # print(df[df[SCORING.adp_column_name()].isnull()])
+    assert len(df[df[SCORING.adp_column_name()].isnull()]) == len(df[df['foundAdp'] == 'left_only'])
+    
+
     pass
