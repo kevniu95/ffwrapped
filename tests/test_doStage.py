@@ -13,6 +13,9 @@ MODULE_DIR = "/Users/kniu91/Documents/kevins_folders/Projects/ffwrapped/src/modu
 SCORING = ScoringType.HPPR
 os.chdir(MODULE_DIR)
 
+LAST_EXCLUDE_YEAR = 2015
+ADJUSTED_PREDICT_YEAR = thisFootballYear()  - LAST_EXCLUDE_YEAR
+
 @pytest.fixture(scope='module')
 def finalRosterDf() -> pd.DataFrame:
     roster_source = '../../data/imports/created/rosters.p'
@@ -30,12 +33,32 @@ def finalAdpDf() -> pd.DataFrame:
                    '../../data/imports/created/adp_nppr_full.p']
     return ADPDataset(SCORING, adp_sources).performSteps()
 
-def test_mergeAdpToPoints(finalPtsDf : pd.DataFrame, finalAdpDf : pd.DataFrame):
-    df = mergeAdpToPoints(finalPtsDf, finalAdpDf, SCORING)
-    # assert df[['Player','Tm','FantPos']].isnull().sum().sum() == 0
-    # assert df[['QB','RB','TE','WR']].sum(axis=1).mean() == 1
-    # print(df[df[SCORING.adp_column_name()].isnull()])
-    assert len(df[df[SCORING.adp_column_name()].isnull()]) == len(df[df['foundAdp'] == 'left_only'])
-    
+@pytest.fixture(scope='module')
+def finalDf(finalPtsDf : pd.DataFrame, finalAdpDf : pd.DataFrame) -> pd.DataFrame:
+    return mergeAdpToPoints(finalPtsDf, finalAdpDf, SCORING)
 
-    pass
+def test_mergeAdpToPoints(finalDf: pd.DataFrame):
+    # Everyone has these 7 fields
+    assert finalDf[['Player','Tm','FantPos']].isnull().sum().sum() == 0
+    assert finalDf[['QB','RB','TE','WR']].sum(axis=1).mean() == 1
+    # 1. Check that only left-onlys don't have ADP info
+    assert len(finalDf[finalDf[SCORING.adp_column_name()].isnull()]) == len(finalDf[finalDf['foundAdp'] == 'left_only'])
+    # 2. Check that only right-onlys don't have pfref id or other info
+    assert len(finalDf[finalDf['pfref_id'].isnull()]) == len(finalDf[finalDf['foundAdp'] == 'right_only'])
+    
+def test_MakeFinalLimitations(finalDf: pd.DataFrame):
+    base_vars_nonnull = ['Age', 
+                        'adjYear', 
+                        'drafted',
+                        'rookie', 'Yrs',
+                        'QB', 'RB', 'TE', 'WR']
+    lastDf = makeFinalLimitations(finalDf, SCORING)
+
+    # 1. Check all non-null fields are indeed non-null
+    assert lastDf[base_vars_nonnull].isnull().sum().sum() == 0
+    # 2. Check all players without PlayersAtPosition or PrvYrTmPtsAtPosition are on multiple teams
+    teamSet = set(lastDf.loc[(lastDf['PlayersAtPosition'].isnull()) | (lastDf['PrvYrTmPtsAtPosition'].isnull()), 'Tm'].unique())
+    for teamName in teamSet:
+        assert teamName.endswith('TM')
+    # 3. Check all players without AdpColumnName are leftOnly from foundAdp merge 
+    assert lastDf[SCORING.adp_column_name()].isnull().sum() == (lastDf['foundAdp'] == 'left_only').sum()    
