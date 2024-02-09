@@ -46,6 +46,14 @@ def test_mergeAdpToPoints(finalDf: pd.DataFrame):
     # 2. Check that only right-onlys don't have pfref id or other info
     assert len(finalDf[finalDf['pfref_id'].isnull()]) == len(finalDf[finalDf['foundAdp'] == 'right_only'])
     
+def test_AddFinalFields(finalDf: pd.DataFrame):
+    finalDfNumCols = len(finalDf.columns)
+    lastDf = addFinalFields(finalDf, LAST_EXCLUDE_YEAR)
+    # 1. Check that AddFinalFields adds fields
+    assert len(lastDf.columns) > finalDfNumCols
+    # 2. Check that no rows are added or deleted
+    assert len(lastDf) == len(finalDf)
+
 def test_MakeFinalLimitations(finalDf: pd.DataFrame):
     base_vars_nonnull = ['Age', 
                         'adjYear', 
@@ -62,3 +70,5 @@ def test_MakeFinalLimitations(finalDf: pd.DataFrame):
         assert teamName.endswith('TM')
     # 3. Check all players without AdpColumnName are leftOnly from foundAdp merge 
     assert lastDf[SCORING.adp_column_name()].isnull().sum() == (lastDf['foundAdp'] == 'left_only').sum()    
+    # 4. Check less players than before
+    assert len(lastDf) <= len(finalDf)
