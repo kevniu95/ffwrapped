@@ -278,7 +278,7 @@ class League():
         pass
 
     def initTeamsDefault(self):
-        self.teams = [Team('team_' + str(i + 1), self.rosterConfig) for i in range(10)]
+        self.teams = [Team('team_' + str(i + 1), self.rosterConfig) for i in range(self.numTeams)]
     
     def getTeamFromId(self, id : str) -> Team:
         return self.teams[id]
@@ -316,17 +316,20 @@ def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_com
     reg_df = loadDatasetAfterBaseRegression(use_compressed=use_compressed)
     # print(reg_df.sample(50))
     reg_df = reg_df[(reg_df ['Year'] == year) 
-                    & (reg_df ['foundAdp'].isin(['left_only', 'both'])
-                    & (reg_df[scoringType.adp_column_name()].notnull()))].copy()
+                    & (reg_df ['foundAdp'].isin(['left_only', 'both']))
+                    ].copy()
     reg_df.sort_values([scoringType.adp_column_name()], inplace = True)
     reg_df.drop_duplicates(subset = 'pfref_id', keep = 'first', inplace = True)
     reg_df['Flex'] = np.where(reg_df['FantPos'].isin(['RB','TE','WR']), 1, 0)
-    reg_df['team'] = np.nan
+    # reg_df['team'] = pd.Series([np.nan] * len(reg_df), dtype="object")
+    reg_df['team'] = pd.Series([pd.NA] * len(reg_df), dtype=pd.StringDtype())
+
+    # reg_df['team'] = np.nan
     reg_df['pick'] = np.nan
     return reg_df
 
-def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) -> SnakeDraft:
-    league = League(10)
+def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType, numTeams: int = 10) -> SnakeDraft:
+    league = League(numTeams)
     league.initTeamsDefault()
 
     playerPoolDf = initPlayerPoolDfFromRegDataset(year, scoringType)
@@ -343,9 +346,10 @@ def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType) 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
     reg_df = loadDatasetAfterBaseRegression(use_compressed = False)
-    # print(reg_df[reg_df['Year'] == 2022])
-    # print(reg_df['Year'].value_counts())
-    # a = initPlayerPoolDfFromRegDataset(2022, ScoringType.HPPR, use_compressed = False)
-    snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
-    for team in snakeDraft.league.teams:
-        print(team.roster)
+    # print(reg_df)
+    print(reg_df[reg_df['Year'] == 2023].head())
+    a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
+    print(a)
+    # snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
+    # for team in snakeDraft.league.teams:
+        # print(team.roster)
