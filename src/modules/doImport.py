@@ -15,8 +15,9 @@ import asyncio
 from pyppeteer import launch
 from aiolimiter import AsyncLimiter
 
-from ..domain.common import ScoringType, thisFootballYear
+from ..domain.common import ScoringType, thisFootballYear, WEEKLY_STATS_PARAMS
 from ..util.logger_config import setup_logger
+from ..util.config import Config
 
 logger = setup_logger(__name__)
 
@@ -297,17 +298,172 @@ class ADPImport(Importer):
             print(c_sub[c_sub['Team'].isin(nameChanges.difference(changedNames))])
             return False
         return True
+    
+class WeeklyStatsImport(Importer):
+    def __init__(self,
+                 login: Dict[str, str],
+                 fullSavePath: str = '../../data/imports/created/weekly_points_{}.csv'):
+        super().__init__(fullSavePath)
+        self.login = login
+        self.max_offset_weeklyplayerstats = 6000
+        self.weeklyStatsParams = WEEKLY_STATS_PARAMS
+        self.base_url = 'https://stathead.com'
+        self.browser = None
+        self.page = None
+    
+    async def _login_to_site(self):
+        login_path = '/users/login.cgi'
+        await self.page.goto(f'{self.base_url}{login_path}', timeout = 10000)
 
+        # Replace 'username' and 'password' with the appropriate name attributes for the login form
+        await self.page.type('[name="username"]', self.login['username'])
+        await self.page.type('[name="password"]', self.login['password'])
+
+        # Simulate pressing Enter to submit the form
+        await self.page.keyboard.press('Enter')
+        
+        # Wait for navigation to ensure the login process is complete
+        await self.page.waitForNavigation()
+    
+    async def start(self):
+        self.browser = await launch(headless=True)  # headless=False to see the browser
+        self.page = await self.browser.newPage()
+        await self._login_to_site()
+        # Add further actions here after login
+
+    async def close(self):
+        await self.browser.close()
+    
+    async def get_weekly_fantasy_stats_page(self, season: int, offset: int) -> pd.DataFrame:
+        page = await self.browser.newPage()
+        print(f"Retrieving page {offset // 200 + 1}...")
+
+        # Assuming self.weeklyStatsParams is already defined and includes all necessary parameters except 'offset', 'year_min', and 'year_max'
+        self.weeklyStatsParams['offset'] = offset
+        self.weeklyStatsParams['year_min'] = season
+        self.weeklyStatsParams['year_max'] = season
+        route = '/football/player-game-finder.cgi'
+        query_string = '&'.join([f'{k}={v}' for k, v in self.weeklyStatsParams.items()])
+        url_with_params = f'{self.base_url}{route}?{query_string}'
+        
+        await(asyncio.sleep(2))
+        await page.goto(url_with_params)
+        content = await self.page.content()
+        table = await self._get_single_pandas_table_from_content(content, element_id='stats')
+        
+        if table is not None:
+            # Process the table as per your existing logic
+            table['Rk'] = pd.to_numeric(table['Rk'], errors='coerce')
+            table = table[table['Rk'].notnull()].reset_index(drop=True)
+            
+            # Example for extracting 'pfref_id', adapting to use BeautifulSoup for parsing
+            soup = BeautifulSoup(content, 'html.parser')
+            elems = soup.select('#div_stats td[data-append-csv]')
+            new_field = [td['data-append-csv'] for td in elems]
+            table['pfref_id'] = pd.Series(new_field)
+        
+        await page.close()
+        return table
+
+    async def _get_single_pandas_table_from_content(self, content: str, element_id: str) -> pd.DataFrame:
+        soup = BeautifulSoup(content, 'html.parser')
+        table_html = soup.find('table', id=element_id)
+        
+        if table_html:
+            table = pd.read_html(str(table_html), header=1)[0]
+            return table
+        else:
+            print(f"Wasn't able to identify element with id {element_id}")
+            return None    
+        
+    async def get_weekly_fantasy_stats_all(self, season: int, obs_limit: int = None, save: bool = False) -> pd.DataFrame:
+        offset_interval = 200
+        all_tables: List[pd.DataFrame] = []
+        tasks_per_minute = 18
+
+        if not obs_limit:
+            obs_limit = self.max_offset_weeklyplayerstats
+
+        offsets = list(range(0, obs_limit + 1, offset_interval))
+
+        # Split offsets into chunks of tasks_per_minute
+        offset_chunks = [offsets[i:i + tasks_per_minute] for i in range(0, len(offsets), tasks_per_minute)]
+
+        for chunk in offset_chunks:
+            # Create a list of tasks to run concurrently
+            tasks = [self.get_weekly_fantasy_stats_page(season, offset) for offset in chunk]
+
+            # Run the tasks and collect the results
+            results = await asyncio.gather(*tasks)
+
+            # Filter out None or empty results and add them to all_tables
+            all_tables.extend([result for result in results if result is not None and not result.empty])
+
+            # Wait for a minute before proceeding to the next chunk
+            await asyncio.sleep(60)
+
+        final_table = pd.concat(all_tables, ignore_index=True)
+
+        if save:
+            self._save(final_table, savePath = self.fullSavePath.format(season))
+
+        return final_table
+    # async def get_weekly_fantasy_stats_all(self, season: int, obs_limit: int = None, save: bool = False) -> pd.DataFrame:
+    #     offset_interval = 200
+    #     offset_current = 0
+    #     all_tables: List[pd.DataFrame] = []
+        
+    #     if not obs_limit:
+    #         obs_limit = self.max_offset_weeklyplayerstats  # Ensure this attribute is defined
+
+    #     while offset_current <= obs_limit:
+    #         current_table = await self.get_weekly_fantasy_stats_page(season, offset_current)
+    #         if current_table is not None and not current_table.empty:
+    #             all_tables.append(current_table)
+    #             offset_current += offset_interval
+    #             if current_table.shape[0] < offset_interval:
+    #                 # Break the loop if the number of rows is less than the interval, indicating we've reached the last page
+    #                 break
+            
+    #     final_table = pd.concat(all_tables, ignore_index=True)
+        
+    #     if save:
+    #         self._save(final_table, savePath = self.fullSavePath.format(season))
+            
+    #     return final_table
+    
+    async def run(self, season: int = 2022, obs_limit: int = None, save : bool = True) -> pd.DataFrame:
+        await self.start()
+        final_table = await scraper.get_weekly_fantasy_stats_all(season=season, obs_limit=obs_limit, save=save)
+        await scraper.close()
+        return final_table  # This will return the DataFrame once the function completes
+    
+    def doImport(self, season: int, obs_limit: int = None, save: bool = True) -> pd.DataFrame:
+        return asyncio.get_event_loop().run_until_complete(self.run(season, obs_limit, save))
+
+        
 if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     print(os.getcwd())
+    config = Config()
+    
+    # =======
+    # Weekly Stats
+    # =======
+    stathead_login = {}
+    stathead_login['username'] = config.parse_section('stathead')['username']
+    stathead_login['password'] = config.parse_section('stathead')['password']
+    
+    scraper = WeeklyStatsImport(stathead_login, '../../data/imports/created/weekly_points/weekly_points_{}.csv')
+    for i in range(2017, 2023):
+        scraper.doImport(i)
     
     # =======
     # Roster
     # =======
-    roster_importer = RosterImport('../../data/imports/created/rosters.p')
-    df_roster = roster_importer.doImport(start_year = 2019, end_year = 2018, save = True)
+    # roster_importer = RosterImport('../../data/imports/created/rosters.p')
+    # df_roster = roster_importer.doImport(start_year = 2019, end_year = 2018, save = True)
     
     # =======
     # ADP
