@@ -281,7 +281,10 @@ class League():
         self.teams = [Team('team_' + str(i + 1), self.rosterConfig) for i in range(self.numTeams)]
     
     def getTeamFromId(self, id : str) -> Team:
-        return self.teams[id]
+        team = [i for i in self.teams if i.id == id]
+        if len(team) == 0:
+            return None
+        return team[0]
 
 class Draft():
     def __init__(self, pool : PlayerPool, league : League):
