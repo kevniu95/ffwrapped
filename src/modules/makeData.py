@@ -5,6 +5,10 @@ import time
 import joblib
 import string
 
+from ..util.logger_config import setup_logger
+LOG_LEVEL = logging.INFO
+logger = setup_logger(__name__, level = LOG_LEVEL)
+
 def getBaselinePointDict(undrafted: pd.DataFrame, points_name: str) -> Dict[str, float]:
     undrafted = undrafted.sort_values(by=['FantPos', points_name], ascending=[True, False])
     baseline_points_df = undrafted[['FantPos','team','pred', points_name]].groupby(['FantPos'])[['FantPos','team','pred',points_name]].apply(get_nth_best_players).reset_index(drop=True)
@@ -60,7 +64,7 @@ def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : Sco
     y[points_name] = y[points_name] / 18
     return y
 
-def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipeline], scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
+def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
     if not leagueId:
         alphabet = string.ascii_lowercase + string.digits
         leagueId = ''.join(random.choices(alphabet, k=8))
@@ -84,11 +88,6 @@ def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipel
     logger.debug("Generating y...")
     if year != 2023:
         y = generateY(drafted, appendMe, scoringType, year)
-        print("This is y head")
-        print(y.head())
-        print("This is y grouped")
-        print(y[['team','Pts_HPPR']].groupby(['team']).sum().sum())
-       
     else:
         y = drafted[['team', 'FantPos']].drop_duplicates()
         y[points_name] = np.nan
@@ -99,7 +98,6 @@ def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipel
     z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
     z['league'] = leagueId
     z['year'] = year
-    print("Done with this iteration.\n")
 
     # score_dfs = []
     # for team in x['team'].unique():
