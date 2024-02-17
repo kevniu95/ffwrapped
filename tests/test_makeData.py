@@ -7,7 +7,7 @@ from src.modules.makeData import *
 from src.util.logger_config import setup_logger
 
 LOG_LEVEL = logging.INFO
-logger = setup_logger(__name__)
+logger = setup_logger(__name__, level = LOG_LEVEL)
 
 pd.options.display.max_columns = None
 MODULE_DIR = "/Users/kniu91/Documents/kevins_folders/Projects/ffwrapped/src/modules"
