@@ -22,10 +22,8 @@ def generateBaselines(baselines_points : Dict[str, float], teams : Set[Team], po
     }
     return pd.DataFrame(baseline_data)
 
-
 def finalizeWeeklyDf(drafted: pd.DataFrame, appendMe: pd.DataFrame, scoringType: ScoringType, year: int) -> pd.DataFrame:
     points_name = scoringType.points_name()
-    print("Generating weekly starters and aggregating...")
     df_dict = pd.read_pickle(f'../../data/imports/created/weekly_points/weekly_points_{year}.p')
     weekly_df  = pd.concat(df_dict.values())
     weekly_df = weekly_df.merge(drafted[['pfref_id','team', 'FantPos']], on = 'pfref_id')
@@ -35,12 +33,10 @@ def finalizeWeeklyDf(drafted: pd.DataFrame, appendMe: pd.DataFrame, scoringType:
     weekly_df[points_name] = weekly_df['FantPt'] + (scoringType.value * weekly_df['Rec'])
     return weekly_df
 
-
 def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : ScoringType, year: int):
     points_name = scoringType.points_name()
     logger.debug("Generating weekly starters and aggregating...")
     weekly_df = finalizeWeeklyDf(drafted, appendMe, scoringType, year)
-    weekly_df.to_csv('2016weeklydf.csv')
     # Get non-FLEX starters
     weekly_df.sort_values(['Week','team', 'FantPos', points_name], ascending = [True, True, True, False], inplace = True)
     weekly_df.reset_index(drop = True, inplace = True)
@@ -50,7 +46,6 @@ def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : Sco
     weekly_df['Rank'] = weekly_df[['Week','team','FantPos', points_name]].groupby(['Week','team','FantPos']).rank(ascending = False, method = 'first')[[points_name]]
     pos_counts = {'QB': 1, 'RB': 2, 'WR': 2, 'TE': 1}
     weekly_df['pos_starters'] = weekly_df['FantPos'].map(pos_counts).astype(int)
-    weekly_df[['Week','team','Player','FantPos',points_name,'Rank','pos_starters']].to_csv('test.csv')
     weekly_df_starters = weekly_df.loc[weekly_df['Rank'] <= weekly_df['pos_starters']]
     
     # # Split rest, and find best FLEX
@@ -93,8 +88,7 @@ def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipel
         print(y.head())
         print("This is y grouped")
         print(y[['team','Pts_HPPR']].groupby(['team']).sum().sum())
-        # print(y.groupby('team').sum()[['team','Pts_HPPR']])
-        
+       
     else:
         y = drafted[['team', 'FantPos']].drop_duplicates()
         y[points_name] = np.nan
