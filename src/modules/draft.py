@@ -263,10 +263,11 @@ class Team():
         return self.id
     
 class League():
-    def __init__(self, numTeams : int, rosterConfig : Dict[str, int] = None):
+    def __init__(self, numTeams : int, year: int ,rosterConfig : Dict[str, int] = None):
         self.numTeams = numTeams
         self.rosterConfig = rosterConfig
         self.teams : Set[Team] = set([])
+        self.year = year
         
         if not self.numTeams:
             self.numTeams = 10
@@ -287,14 +288,15 @@ class League():
         return team[0]
 
 class Draft():
-    def __init__(self, pool : PlayerPool, league : League):
+    def __init__(self, pool : PlayerPool, league : League, year: int):
         self.pool = pool
         self.league = league
+        self.year = year
         self.rounds = sum([v for v in self.league.rosterConfig.values()]) - 2
 
 class SnakeDraft(Draft):
-    def __init__(self, pool : PlayerPool, league : League):
-        super().__init__(pool, league)
+    def __init__(self, pool : PlayerPool, league : League, year: int):
+        super().__init__(pool, league, year)
         self.draftOrder = None
     
     def getDraftOrder(self, shuffle : bool = True) -> List[Team]:
@@ -332,12 +334,12 @@ def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_com
     return reg_df
 
 def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType, numTeams: int = 10) -> SnakeDraft:
-    league = League(numTeams)
+    league = League(numTeams, year)
     league.initTeamsDefault()
 
     playerPoolDf = initPlayerPoolDfFromRegDataset(year, scoringType)
     playerPool = ADPPlayerPool(playerPoolDf, scoringType)
-    snakeDraft = SnakeDraft(playerPool, league)
+    snakeDraft = SnakeDraft(playerPool, league, year)
     draftOrder = snakeDraft.getDraftOrder(shuffle = False)
     
     for num, team in enumerate(draftOrder):

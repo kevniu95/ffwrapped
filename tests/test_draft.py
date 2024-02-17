@@ -24,7 +24,7 @@ def test_initPlayerPoolDfFromRegDataset(year: int):
 
 @pytest.mark.parametrize("numTeams", [8, 10, 12])
 def test_initTeamsDefault(numTeams: int):
-    league = League(numTeams)
+    league = League(numTeams, 2022)
     league.initTeamsDefault()
     assert len(league.teams) == numTeams
     assert len(set([i.id for i in league.teams])) == numTeams
@@ -33,8 +33,9 @@ def test_initTeamsDefault(numTeams: int):
 # TODO: Update draft logic to account for 8 and 12-team leagues too
 # ====== 
 @pytest.mark.parametrize("numTeams", [10])
-def test_simulateLeagueAndDraft(numTeams: int):
-    simulated = simulateLeagueAndDraft(2023, DRAFT_TEMP, SCORING, numTeams)
+@pytest.mark.parametrize("year", [2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016])
+def test_simulateLeagueAndDraft(numTeams: int, year: int):
+    simulated = simulateLeagueAndDraft(year, DRAFT_TEMP, SCORING, numTeams)
     sim_df = simulated.pool.df
     sim_df.to_csv('sim.csv', index = False)
     rosterSpotsDrafted =  sum(ROSTER_CONFIG_DEFAULT.values()) - 2

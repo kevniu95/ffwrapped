@@ -448,16 +448,16 @@ if __name__ == '__main__':
     print(os.getcwd())
     config = Config()
     
-    # # =======
-    # # Weekly Stats
-    # # =======
-    # stathead_login = {}
-    # stathead_login['username'] = config.parse_section('stathead')['username']
-    # stathead_login['password'] = config.parse_section('stathead')['password']
+    # =======
+    # Weekly Stats
+    # =======
+    stathead_login = {}
+    stathead_login['username'] = config.parse_section('stathead')['username']
+    stathead_login['password'] = config.parse_section('stathead')['password']
     
-    # scraper = WeeklyStatsImport(stathead_login, '../../data/imports/created/weekly_points/weekly_points_{}.csv')
-    # for i in range(2020, 2023):
-    #     scraper.doImport(i)
+    scraper = WeeklyStatsImport(stathead_login, '../../data/imports/created/weekly_points/weekly_points_{}.csv')
+    for i in range(2016, 2019):
+        scraper.doImport(i)
     
     # =======
     # Roster

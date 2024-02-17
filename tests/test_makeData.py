@@ -15,9 +15,11 @@ SCORING = ScoringType.HPPR
 DRAFT_TEMP = 4
 os.chdir(MODULE_DIR)
 
-@pytest.mark.parametrize("year", [2016, 2017, 2018, 2019, 2020, 2021, 2022])
-def test_getBaselinePointDict(year: int):
-    finishedDraft = simulateLeagueAndDraft(year, 4, scoringType = SCORING)
+@pytest.fixture(scope='module', params = [2016, 2017, 2018, 2019, 2020, 2021, 2022])
+def finishedDraft(request) -> pd.DataFrame:
+    return simulateLeagueAndDraft(request.param, 4, SCORING)
+
+def test_getBaselinePointDict(finishedDraft: pd.DataFrame):
     df = finishedDraft.pool.df
     undrafted = df.loc[df['team'].isnull()]
     points_name = SCORING.points_name()
@@ -41,8 +43,8 @@ dict1 = {'QB': 214.98, 'RB': 72.6, 'WR': 127.4, 'TE': 97.7}
 dict2 = {'QB': 241.22, 'RB': 111.6, 'WR': 129.70000000000002, 'TE': 118.6}
 dict3 = {'QB': 224.94, 'RB': 95.10000000000001, 'WR': 122.5, 'TE': 119.72}
 @pytest.mark.parametrize("entryDict", [dict1, dict2, dict3])
-def test_generateBaselines(entryDict: [str, float]):
-    league = League(10)
+def test_generateBaselines(entryDict: Dict[str, float]):
+    league = League(10, 2022)
     league.initTeamsDefault()
     positions = ['QB', 'RB', 'WR', 'TE']
     baseslineDf = generateBaselines(entryDict, league.teams, positions = positions)
@@ -53,4 +55,18 @@ def test_generateBaselines(entryDict: [str, float]):
     
     # Validate that each position has one unique baseline value
     unique_ppr_per_pos = baseslineDf.groupby('FantPos')['PPR'].nunique()
-    assert all(unique_ppr_per_pos == 1)
+    assert all(unique_ppr_per_pos   == 1)
+
+def test_generateY(finishedDraft: pd.DataFrame):
+    df = finishedDraft.pool.df
+    drafted = df.loc[df['team'].notnull()]
+    undrafted = df.loc[df['team'].isnull()]
+    points_name = SCORING.points_name()
+    baselinePoints = getBaselinePointDict(undrafted, points_name)
+    appendMe = generateBaselines(baselinePoints, finishedDraft.league.teams)
+    y_df = generateY(drafted, appendMe, SCORING, finishedDraft.year)
+    # print(y_df.head(10))
+    # print(y_df['Pts_HPPR'])
+    # print(y_df['Pts_HPPR'].sum())
+    print(finishedDraft.year)
+    print(y_df['Pts_HPPR'].sum() / len(finishedDraft.league.teams))

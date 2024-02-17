@@ -23,24 +23,24 @@ def generateBaselines(baselines_points : Dict[str, float], teams : Set[Team], po
     return pd.DataFrame(baseline_data)
 
 
-def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : ScoringType, year: int):
+def finalizeWeeklyDf(drafted: pd.DataFrame, appendMe: pd.DataFrame, scoringType: ScoringType, year: int) -> pd.DataFrame:
     points_name = scoringType.points_name()
     print("Generating weekly starters and aggregating...")
     df_dict = pd.read_pickle(f'../../data/imports/created/weekly_points/weekly_points_{year}.p')
     weekly_df  = pd.concat(df_dict.values())
     weekly_df = weekly_df.merge(drafted[['pfref_id','team', 'FantPos']], on = 'pfref_id')
-    weekly_df = pd.concat([weekly_df, appendMe, appendMe])
+    weekly_df = pd.concat([weekly_df, appendMe, appendMe]) # At max, 2 waiver-wire baselines can be selected starters per position
 
     weekly_df[['Week','FantPt','Rec']] = weekly_df[['Week','FantPt','Rec']].apply(pd.to_numeric, errors = 'coerce').fillna(0)
-    
-    # print(weekly_df[weekly_df['Week'].isnull()]) 
-    # print(appendMe.shape)
-    # print(appendMe.head())
-    
-    # print(weekly_df['FantPt'])
-    # print(scoringType.value)
     weekly_df[points_name] = weekly_df['FantPt'] + (scoringType.value * weekly_df['Rec'])
-    
+    return weekly_df
+
+
+def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : ScoringType, year: int):
+    points_name = scoringType.points_name()
+    logger.debug("Generating weekly starters and aggregating...")
+    weekly_df = finalizeWeeklyDf(drafted, appendMe, scoringType, year)
+    weekly_df.to_csv('2016weeklydf.csv')
     # Get non-FLEX starters
     weekly_df.sort_values(['Week','team', 'FantPos', points_name], ascending = [True, True, True, False], inplace = True)
     weekly_df.reset_index(drop = True, inplace = True)
@@ -86,12 +86,15 @@ def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipel
     
     # Generate Y - Average Total PF for each team, for each position
         # Total by week -  so 2x average RB score for RB
-    print("Generating y...")
+    logger.debug("Generating y...")
     if year != 2023:
         y = generateY(drafted, appendMe, scoringType, year)
-        now = time.time()
-        print(f"Generating starters by agg method took {now- st} seconds")
-        st = now
+        print("This is y head")
+        print(y.head())
+        print("This is y grouped")
+        print(y[['team','Pts_HPPR']].groupby(['team']).sum().sum())
+        # print(y.groupby('team').sum()[['team','Pts_HPPR']])
+        
     else:
         y = drafted[['team', 'FantPos']].drop_duplicates()
         y[points_name] = np.nan
@@ -185,10 +188,7 @@ if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
-    # makeSmallWeeklySets()
-
-    # def makeData(year : int, temp : float, models : Dict[str, sklearn.pipeline.Pipeline], scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
-    a = makeData(2022, 4, None, ScoringType.HPPR)
+    a = makeData(2016, 4, None, ScoringType.HPPR)
     print(a.shape)
     print(a.head())
     # f'../../data/regression/rosterConfig/test.csv'
