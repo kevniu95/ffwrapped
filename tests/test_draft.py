@@ -14,6 +14,7 @@ MODULE_DIR = "/Users/kniu91/Documents/kevins_folders/Projects/ffwrapped/src/modu
 SCORING = ScoringType.HPPR
 DRAFT_TEMP = 4
 NUM_TEAMS = 10
+COL_SUBSET = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred']
 os.chdir(MODULE_DIR)
 
 @pytest.fixture(scope='module', params = [2016, 2017, 2018, 2019, 2020, 2021, 2022])
@@ -22,7 +23,8 @@ def finishedDraft(request) -> Draft:
 
 @pytest.mark.parametrize("year", [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023])
 def test_initPlayerPoolDfFromRegDataset(year: int):
-    a = initPlayerPoolDfFromRegDataset(year, SCORING, use_compressed = False)
+    col_subset = COL_SUBSET  + [SCORING.points_name(), SCORING.adp_column_name()]
+    a = initPlayerPoolDfFromRegDataset(year, SCORING, col_subset)
     assert (a.shape[0] == a.drop_duplicates().shape[0])
     assert a['pred'].isnull().sum() == 0
     assert all([i in a.columns for i in ['Flex','team','pick']])

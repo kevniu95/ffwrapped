@@ -6,7 +6,7 @@ import joblib
 import string
 
 from ..util.logger_config import setup_logger
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 def get_nth_best_players(group) -> pd.DataFrame:
@@ -108,11 +108,11 @@ def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int
         # Total by week -  so 2x average RB score for RB
     logger.debug("Generating y...")
     # if year != 2023:
-    #     y = generateY(drafted, appendMe, scoringType, year)
+    y = generateY(drafted, appendMe, scoringType, year)
     # else:
-    y = drafted[['team', 'FantPos']].drop_duplicates()
-    y[points_name] = np.nan
-    y.sort_values(['team','FantPos'], inplace = True)
+    # y = drafted[['team', 'FantPos']].drop_duplicates()
+    # y[points_name] = np.nan
+    # y.sort_values(['team','FantPos'], inplace = True)
     
     x = getRosterConfigVariables(drafted, finishedDraft.league)
     x.sort_values(['team','FantPos'], inplace= True)
@@ -177,10 +177,22 @@ def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int
 #     return models    
 
 if __name__ == '__main__':
+    pd.options.display.max_columns = None
+    
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
-    a = makeData(2016, 4, ScoringType.HPPR)
+    print(makeData(2016, 4, ScoringType.HPPR))
+    # for i in range(2500):
+    #     for year in range(2016, 2023):
+    #         print(year)
+    #         a = makeData(year, 4, ScoringType.HPPR)
+    #         path = f'../../data/research/created/regression/rosterConfig2023Draft_f.csv'
+    #         if os.path.exists(path):
+    #             a.to_csv(path, mode = 'a', header = False, index = False)
+    #         else:
+    #             a.to_csv(path, index = False)
+    #         print()
     
     # f'../../data/regression/rosterConfig/test.csv'
     # a.to_csv(f'../../data/regression/rosterConfig/test.csv', index = False)

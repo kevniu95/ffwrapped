@@ -317,27 +317,29 @@ def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
     e_x = np.exp(x - np.max(x))  # prevent overflow with subtraction
     return e_x / e_x.sum(axis=0)
 
-def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, use_compressed : bool = False) -> pd.DataFrame:
+def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, colSubset : List[str], use_compressed : bool = False) -> pd.DataFrame:
     reg_df = loadDatasetAfterBaseRegression(use_compressed=use_compressed)
-    # print(reg_df.sample(50))
-    reg_df = reg_df[(reg_df ['Year'] == year) 
-                    & (reg_df ['foundAdp'].isin(['left_only', 'both']))
+    reg_df = reg_df.loc[(reg_df ['Year'] == year) 
+                    & (reg_df ['foundAdp'].isin(['left_only', 'both'])),
+                    colSubset
                     ].copy()
     reg_df.sort_values([scoringType.adp_column_name()], inplace = True)
     reg_df.drop_duplicates(subset = 'pfref_id', keep = 'first', inplace = True)
     reg_df['Flex'] = np.where(reg_df['FantPos'].isin(['RB','TE','WR']), 1, 0)
-    # reg_df['team'] = pd.Series([np.nan] * len(reg_df), dtype="object")
     reg_df['team'] = pd.Series([pd.NA] * len(reg_df), dtype=pd.StringDtype())
-
-    # reg_df['team'] = np.nan
     reg_df['pick'] = np.nan
     return reg_df
 
-def simulateLeagueAndDraft(year : int, temp : float, scoringType : ScoringType, numTeams: int = 10) -> SnakeDraft:
+def simulateLeagueAndDraft(year : int, 
+                           temp : float, 
+                           scoringType : ScoringType, 
+                           numTeams: int = 10,
+                           colSubset : List[str] = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred']) -> SnakeDraft:
+    colSubset = colSubset + [scoringType.adp_column_name(), scoringType.points_name()]
     league = League(numTeams, year)
     league.initTeamsDefault()
 
-    playerPoolDf = initPlayerPoolDfFromRegDataset(year, scoringType)
+    playerPoolDf = initPlayerPoolDfFromRegDataset(year, scoringType, colSubset)
     playerPool = ADPPlayerPool(playerPoolDf, scoringType)
     snakeDraft = SnakeDraft(playerPool, league, year)
     draftOrder = snakeDraft.getDraftOrder(shuffle = False)
@@ -353,7 +355,8 @@ if __name__ == '__main__':
     reg_df = loadDatasetAfterBaseRegression(use_compressed = False)
     # print(reg_df)
     print(reg_df[reg_df['Year'] == 2023].head())
-    a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, use_compressed = False)
+    col_subset = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred'] + [ScoringType.HPPR.adp_column_name(), ScoringType.HPPR.points_name()]
+    a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, col_subset, use_compressed = False)
     print(a)
     # snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
     # for team in snakeDraft.league.teams:
