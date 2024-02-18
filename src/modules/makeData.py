@@ -129,15 +129,15 @@ if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
+    st = time.time()
     for i in range(2500):
-        st = time.time()
         if i % 50 == 0:
             logger.info(f"Starting iteration {i}")
             logger.info(f"10 its took {time.time()  - st}")
             st = time.time()
         for year in range(2016, 2023):
             a = makeData(year, 4, ScoringType.HPPR)
-            path = f'../../data/regression/rosterConfig/rosterConfigData.csv'
+            path = f'../../data/regression/rosterConfig/rosterConfigData1.csv'
             if os.path.exists(path):
                 a.to_csv(path, mode = 'a', header = False, index = False)
             else:

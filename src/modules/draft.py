@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 import numpy as np
 import sklearn
+from sklearn import pipeline
 
 from ..domain.common import ScoringType, loadDatasetAfterBaseRegression
 
