@@ -5,12 +5,12 @@ def setup_logger(name, level: int = logging.INFO):
 
     # Setting up the console handler
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(level)
     ch.setFormatter(formatter)
 
     # Set up the logger
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
     logger.addHandler(ch)
 
     return logger

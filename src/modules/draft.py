@@ -1,8 +1,17 @@
-from .doPrep import *
-from .doStage import *
-from typing import List, Dict, Set
 import random
-from abc import ABC, abstractmethod
+from abc import ABC
+from typing import List, Dict, Set, Any
+import logging
+import pandas as pd
+import numpy as np
+import sklearn
+
+from ..domain.common import ScoringType, loadDatasetAfterBaseRegression
+
+from ..util.logger_config import setup_logger
+LOG_LEVEL = logging.INFO
+logger = setup_logger(__name__, level = logging.INFO)
+
 
 '''
 Simulate fantasy football draft
@@ -335,6 +344,7 @@ def simulateLeagueAndDraft(year : int,
                            scoringType : ScoringType, 
                            numTeams: int = 10,
                            colSubset : List[str] = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred']) -> SnakeDraft:
+    # st = time.time()
     colSubset = colSubset + [scoringType.adp_column_name(), scoringType.points_name()]
     league = League(numTeams, year)
     league.initTeamsDefault()
@@ -344,10 +354,13 @@ def simulateLeagueAndDraft(year : int,
     snakeDraft = SnakeDraft(playerPool, league, year)
     draftOrder = snakeDraft.getDraftOrder(shuffle = False)
     
+    # logger.info(f"Time to initialize league and pool: {time.time() - st}")
+
+    # st = time.time()
     for num, team in enumerate(draftOrder):
         playerId : str = team.selectFromPool(snakeDraft.pool, num + 1, temp)
         team.finalizeSelection(playerId, snakeDraft.pool, num + 1)
-    
+    # logger.info(f"Time to draft: {time.time() - st}")
     return snakeDraft
 
 if __name__ == '__main__':
@@ -357,7 +370,7 @@ if __name__ == '__main__':
     print(reg_df[reg_df['Year'] == 2023].head())
     col_subset = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred'] + [ScoringType.HPPR.adp_column_name(), ScoringType.HPPR.points_name()]
     a = initPlayerPoolDfFromRegDataset(2023, ScoringType.HPPR, col_subset, use_compressed = False)
-    print(a)
-    # snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
+    # print(a)
+    snakeDraft = simulateLeagueAndDraft(2023, 4, ScoringType.HPPR)
     # for team in snakeDraft.league.teams:
         # print(team.roster)

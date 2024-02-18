@@ -1,13 +1,11 @@
-import pathlib
-import os
+# from .draft import *
+# from typing import Set
 from itertools import product
 import time
+# import joblib
 import logging
 import string
 import pandas as pd
-
-from .draft import *
-from ..domain.common import ScoringType, thisFootballYear, loadDatasetAfterBaseRegression
 
 from ..util.logger_config import setup_logger
 LOG_LEVEL = logging.INFO
@@ -132,8 +130,63 @@ def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int
     z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
     z['league'] = leagueId
     z['year'] = year
+    # logger.info(f"Time to merge x and y: {time.time() - st}")
+
+    # score_dfs = []
+    # for team in x['team'].unique():
+    #     sub_df = x[x['team'] == team].copy()
+    #     pred_score = getTeamScoreFromRosterConfig(sub_df, models)
+    #     pred_score['team'] = team
+    #     score_dfs.append(pred_score[['team','Total']])
+    # score_df = pd.concat(score_dfs)
+    
+    # if savePlayerList:
+    #     df['league'] = leagueId
+    #     keep_fields = ['league','Player', 'pfref_id','team', 'FantPos', scoringType.adp_column_name(), 'pred', 'var_pred', 'pick']
+    #     save_drafted = df.loc[df['team'].notnull(), keep_fields]
+
+    #     picks = save_drafted[['league','team','pick','pfref_id', 'FantPos']]
+    #     final_picks = score_df[['team','Total']].merge(picks)
+    #     final_picks = final_picks[['league','team','Total','pick','pfref_id','FantPos']].sort_values(['team','pick'])
+        
+    #     path = f'../../data/research/created/regression/picks2023Draft_f.csv'
+    #     if os.path.exists(path):
+    #         final_picks.to_csv(path, mode = 'a', header = False, index = False)
+    #     else:
+    #         final_picks.to_csv(path, index = False)
+        
     return z[['year','league','team','FantPos',points_name, 'A_pred_points','A_std_error', 'B_pred_points', 'B_std_error', 'num_others', 'avg_pred_points_other', 'avg_std_error_other']]
 
+# def getTeamScoreFromRosterConfig(df : pd.DataFrame, models : Dict[str, sklearn.pipeline.Pipeline]) -> pd.DataFrame:
+#     df_extended = df
+#     sum = 0
+#     score_dict = {}
+#     for pos in ['QB', 'RB', 'WR', 'TE', 'FLEX']:
+#         base_vars = ['A_pred_points',
+#             'A_std_error',
+#             'num_others',
+#             'avg_pred_points_other',
+#             'avg_std_error_other'
+#             ]
+#         model = models[pos]
+#         if pos in['RB','WR']:
+#             base_vars = base_vars + ['B_pred_points', 'B_std_error']
+
+#         base = model.predict(df_extended.loc[df_extended['FantPos'] == pos, base_vars])[0]
+#         score_dict[pos] = base
+#         sum += base
+#     score_dict['Total'] = sum
+#     return pd.DataFrame([score_dict])
+
+# def initializeModels(path = f'../../data/research/created/results') -> Dict[str, sklearn.pipeline.Pipeline]:
+#     positions = ['QB','RB','TE','WR','FLEX']
+#     models = {}
+
+#     for pos in positions:
+#         file_path = path + f'/{pos}_rosterconfigreg_params_1.joblib'
+#         model = joblib.load(file_path)
+#         models[pos] = model
+#     return models    
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
@@ -141,6 +194,7 @@ if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
+    # print(makeData(2016, 4, ScoringType.HPPR))
     for i in range(2500):
         st = time.time()
         if i % 50 == 0:
@@ -148,9 +202,51 @@ if __name__ == '__main__':
             logger.info(f"10 its took {time.time()  - st}")
             st = time.time()
         for year in range(2016, 2023):
+            # print(year)
+            # time how long it takes to run this funciton
+            # start_time = time.time()
             a = makeData(year, 4, ScoringType.HPPR)
+            # end_time = time.time()
+            # print(f"Time to run: {end_time - start_time}")
             path = f'../../data/regression/rosterConfig/rosterConfigData.csv'
             if os.path.exists(path):
                 a.to_csv(path, mode = 'a', header = False, index = False)
             else:
                 a.to_csv(path, index = False)
+            
+    # f'../../data/regression/rosterConfig/test.csv'
+    # a.to_csv(f'../../data/regression/rosterConfig/test.csv', index = False)
+    # models = initializeModels()
+
+    # for year in range(2022, 2023):
+    #     print(year)
+    #     for i in range(1):
+    #         print(i)
+    #         df = makeData(year, 4, i + 1, ScoringType.HPPR)
+    #         # path = f'../../data/research/created/regression/maxByRosterConfig_2.csv'
+    #         # if os.path.exists(path):
+    #         #     df.to_csv(path, mode = 'a', header = False, index = False)
+    #         # else:
+    #         #     df.to_csv(path, index = False)
+    #         print()
+    
+    # for i in range(7500):
+    #     print(i)
+    #     df = makeData(2023, 3, models, ScoringType.HPPR)
+    #     path = f'../../data/research/created/regression/rosterConfig2023Draft_f.csv'
+    #     print(df.shape)
+    #     if os.path.exists(path):
+    #         df.to_csv(path, mode = 'a', header = False, index = False)
+    #     else:
+    #         df.to_csv(path, index = False)
+    
+    # for i in range(2500):
+    #     print(i)
+    #     df = makeData(2023, 2.5, models, ScoringType.HPPR)
+    #     path = f'../../data/research/created/regression/rosterConfig2023Draft_f.csv'
+    #     print(df.shape)
+    #     if os.path.exists(path):
+    #         df.to_csv(path, mode = 'a', header = False, index = False)
+    #     else:
+    #         df.to_csv(path, index = False)
+        

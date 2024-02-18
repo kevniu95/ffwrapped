@@ -2,10 +2,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 import pytest
+import os
 
 from src.modules.draft import *
 from src.util.logger_config import setup_logger
-
 LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__)
 
