@@ -58,8 +58,6 @@ def doRegressions(scoringType : ScoringType, points_only : bool = False):
     model_dict = dict(zip(pos_list, model_list))
 
     base_df = pd.read_csv('../../data/regression/rosterConfig/rosterConfigData.csv')
-    base_df1 = pd.read_csv('../../data/regression/rosterConfig/rosterConfigData1.csv')
-    base_df = pd.concat([base_df, base_df1])
     base_df.reset_index(inplace = True)
     for position in pos_list:
         print(position)
@@ -97,11 +95,23 @@ def doRegressionOnPosition(position : str, base_df : pd.DataFrame, scoringType :
     reg_df['pred'] = adp_pts_model_0.predict(reg_df[base_vars])
     base_df.loc[reg_df['index'], 'pred'] = reg_df['pred']
     return base_df
-                
+
+def initializeModels(path = f'../../data/regression/rosterConfig/results') -> Dict[str, sklearn.pipeline.Pipeline]:
+    positions = ['QB','RB','TE','WR','FLEX']
+    models = {}
+
+    for pos in positions:
+        file_path = path + f'/{pos}_rosterconfigreg_params.joblib'
+        model = joblib.load(file_path)
+        models[pos] = model
+    return models   
+
 if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
-    doRegressions(ScoringType.HPPR, points_only = False)
+    # doRegressions(ScoringType.HPPR, points_only = False)
+    models = initializeModels()
+    print(models)
     # doRegressionOnPosition('QB', )
     # def doRegressionOnPosition(position : str, base_df : pd.DataFrame, scoringType : ScoringType, save : bool = True, points_only : bool = False, polys : int = 3, regressor = LASSO_CV_REGRESSOR) -> None:
     # doRegressions(ScoringType.HPPR, points_only = False)

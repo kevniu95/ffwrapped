@@ -79,7 +79,7 @@ def test_getRosterConfigVariables(finishedDraft: Draft):
 
 @pytest.mark.parametrize("year", [2016, 2017, 2018, 2019, 2020, 2021, 2022])
 def test_makeData(year: int):
-    res = makeData(year, DRAFT_TEMP, SCORING)
+    res = makeDataForRegression(year, DRAFT_TEMP, SCORING)
     numTeams = 10
     assert len(res) == numTeams * len(['QB','RB','WR','TE','FLEX'])
     assert res.drop_duplicates(['team','FantPos']).shape[0] == res.shape[0]

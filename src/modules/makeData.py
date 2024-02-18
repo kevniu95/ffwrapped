@@ -7,6 +7,7 @@ import string
 import pandas as pd
 
 from .draft import *
+from .rosterConfigRegression import initializeModels
 from ..domain.common import ScoringType, thisFootballYear, loadDatasetAfterBaseRegression
 
 from ..util.logger_config import setup_logger
@@ -88,7 +89,7 @@ def getRosterConfigVariables(df : pd.DataFrame, league : League) -> pd.DataFrame
     df_extended = pd.DataFrame(lst, columns=rows[0].keys())
     return df_extended
 
-def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
+def makeDataForRegression(year : int, temp : float, scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
     if not leagueId:
         alphabet = string.ascii_lowercase + string.digits
         leagueId = ''.join(random.choices(alphabet, k=8))
@@ -122,6 +123,84 @@ def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int
     z['year'] = year
     return z[['year','league','team','FantPos',points_name, 'A_pred_points','A_std_error', 'B_pred_points', 'B_std_error', 'num_others', 'avg_pred_points_other', 'avg_std_error_other']]
 
+def _finalizePickDataset(df: pd.DataFrame, score_df: pd.DataFrame, leagueId: str):
+    df['league'] = leagueId
+    
+    keep_fields = ['league','team','pick','pfref_id', 'FantPos']
+    picks = df.loc[df['team'].notnull(), keep_fields]
+    final_picks = score_df[['team','Total']].merge(picks)
+    final_picks = final_picks[['league','team','Total','pick','pfref_id','FantPos']].sort_values(['team','pick'])
+    return final_picks
+
+def _savePicks(final_picks: pd.DataFrame, year: int):
+    path = f'../../data/regression/queryableDraftPicks{year}.csv'
+    if os.path.exists(path):
+        final_picks.to_csv(path, mode = 'a', header = False, index = False)
+    else:
+        final_picks.to_csv(path, index = False)
+
+def makeDataForQuery(year : int, temp : float, scoringType = ScoringType, models = Dict[str, sklearn.pipeline.Pipeline], leagueId : str = None) -> pd.DataFrame:
+    if not leagueId:
+        alphabet = string.ascii_lowercase + string.digits
+        leagueId = ''.join(random.choices(alphabet, k=8))
+
+    # Simulate draft
+    logger.debug(f"Simulating draft for year {year}...")
+    finishedDraft = simulateLeagueAndDraft(year, temp, scoringType = scoringType)
+    df = finishedDraft.pool.df
+    drafted = df.loc[df['team'].notnull(), ['pfref_id','team', 'FantPos', 'pred', 'var_pred']]
+    
+    # Generate Y - Average Total PF for each team, for each position
+        # Total by week -  so 2x average RB score for RB
+    y = drafted[['team', 'FantPos']].drop_duplicates()
+    y[scoringType.points_name()] = np.nan
+    y.sort_values(['team','FantPos'], inplace = True)
+    
+    x = getRosterConfigVariables(drafted, finishedDraft.league)
+    x.sort_values(['team','FantPos'], inplace= True)
+    z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
+    z['league'] = leagueId
+    z['year'] = year
+    print("Done with this iteration.\n")
+    
+    # Merge x and y together
+    x.sort_values(['team','FantPos'], inplace= True)
+    z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
+    z['league'] = leagueId
+    z['year'] = year
+
+    score_dfs = []
+    for team in x['team'].unique():
+        sub_df = x[x['team'] == team].copy()
+        pred_score = getTeamScoreFromRosterConfig(sub_df, models)
+        pred_score['team'] = team
+        score_dfs.append(pred_score[['team','Total']])
+    score_df = pd.concat(score_dfs)
+    
+    finalPicks = _finalizePickDataset(df, score_df, leagueId)
+    _savePicks(finalPicks, year)
+    return finalPicks
+
+def getTeamScoreFromRosterConfig(df : pd.DataFrame, models : Dict[str, sklearn.pipeline.Pipeline]) -> pd.DataFrame:
+    df_extended = df
+    sum = 0
+    score_dict = {}
+    for pos in ['QB', 'RB', 'WR', 'TE', 'FLEX']:
+        base_vars = ['A_pred_points',
+            'A_std_error',
+            'num_others',
+            'avg_pred_points_other',
+            'avg_std_error_other'
+            ]
+        model = models[pos]
+        if pos in['RB','WR']:
+            base_vars = base_vars + ['B_pred_points', 'B_std_error']
+
+        base = model.predict(df_extended.loc[df_extended['FantPos'] == pos, base_vars])[0]
+        score_dict[pos] = base
+        sum += base
+    score_dict['Total'] = sum
+    return pd.DataFrame([score_dict])
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
@@ -129,16 +208,26 @@ if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
 
-    st = time.time()
-    for i in range(2500):
-        if i % 50 == 0:
-            logger.info(f"Starting iteration {i}")
-            logger.info(f"10 its took {time.time()  - st}")
-            st = time.time()
-        for year in range(2016, 2023):
-            a = makeData(year, 4, ScoringType.HPPR)
-            path = f'../../data/regression/rosterConfig/rosterConfigData1.csv'
-            if os.path.exists(path):
-                a.to_csv(path, mode = 'a', header = False, index = False)
-            else:
-                a.to_csv(path, index = False)
+    # ============
+    # Create data for roster config regression
+    # ============
+    # st = time.time()
+    # for i in range(2500):
+    #     if i % 50 == 0:
+    #         logger.info(f"Starting iteration {i}")
+    #         logger.info(f"10 its took {time.time()  - st}")
+    #         st = time.time()
+    #     for year in range(2016, 2023):
+    #         a = makeDataForRegression(year, 4, ScoringType.HPPR)
+    #         path = f'../../data/regression/rosterConfig/rosterConfigData1.csv'
+    #         if os.path.exists(path):
+    #             a.to_csv(path, mode = 'a', header = False, index = False)
+    #         else:
+    #             a.to_csv(path, index = False)
+    
+    # ============
+    # Create data for query
+    # ============
+    models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
+    makeDataForQuery(2023, 4, ScoringType.HPPR, models = models)
+
