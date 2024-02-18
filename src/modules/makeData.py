@@ -56,12 +56,11 @@ def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : Sco
     logger.debug("Generating weekly starters and aggregating...")
     st = time.time()
     weekly_df = finalizeWeeklyDf(drafted, appendMe, scoringType, year)
-    # logger.info(f"Time to finalize weekly df: {time.time() - st}")
+    
     # Get non-FLEX starters
     weekly_df.sort_values(['Week','team', 'FantPos', points_name], ascending = [True, True, True, False], inplace = True)
     weekly_df.reset_index(drop = True, inplace = True)
     weekly_df[points_name] = pd.to_numeric(weekly_df[points_name], errors = 'coerce')
-    # print(weekly_df[weekly_df[points_name].isnull()])
     weekly_df[points_name] = weekly_df[points_name].astype(float)
     weekly_df['Rank'] = weekly_df[['Week','team','FantPos', points_name]].groupby(['Week','team','FantPos']).rank(ascending = False, method = 'first')[[points_name]]
     pos_counts = {'QB': 1, 'RB': 2, 'WR': 2, 'TE': 1}
@@ -74,8 +73,7 @@ def generateY(drafted : pd.DataFrame, appendMe : pd.DataFrame, scoringType : Sco
     weekly_df_flex_cands.sort_values(['Week','team',points_name],ascending = [True, True, False], inplace= True)
     weekly_flex_starters = weekly_df_flex_cands.groupby(['Week','team','FantPos'], as_index = False).first()
     starting_lineup = pd.concat([weekly_df_starters, weekly_flex_starters])
-    # starting_lineup = weekly_df.groupby(['Week', 'team']).apply(getWeeklyHigh).reset_index(drop=True)
-
+    
     y = starting_lineup[['team','FantPos',points_name]].groupby(['team','FantPos'], as_index = False).sum()[['team','FantPos', points_name]]
     y[points_name] = y[points_name] / 18
     return y
@@ -87,7 +85,6 @@ def getRosterConfigVariables(df : pd.DataFrame, league : League) -> pd.DataFrame
         team = league.getTeamFromId(team)
         rows = team.getRosterConfigOneTeam(df)
         lst.extend(rows)
-        # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
     df_extended = pd.DataFrame(lst, columns=rows[0].keys())
     return df_extended
 
@@ -115,19 +112,10 @@ def makeData(year : int, temp : float, scoringType = ScoringType, leagueId : int
     # Generate Y - Average Total PF for each team, for each position
         # Total by week -  so 2x average RB score for RB
     logger.debug("Generating y...")
-    # if year != 2023:
-    # st = time.time()
     y = generateY(drafted, appendMe, scoringType, year)
-    # logger.info(f"Time to generate y: {time.time() - st}")
-    # else:
-    # y = drafted[['team', 'FantPos']].drop_duplicates()
-    # y[points_name] = np.nan
-    # y.sort_values(['team','FantPos'], inplace = True)
-    # st = time.time()
     x = getRosterConfigVariables(drafted, finishedDraft.league)
-    # logger.info(f"Time to generate x: {time.time() - st}")
-
-    # st = time.time()
+    
+    # Merge x and y together
     x.sort_values(['team','FantPos'], inplace= True)
     z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
     z['league'] = leagueId
