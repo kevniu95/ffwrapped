@@ -1,6 +1,5 @@
 import pathlib
 import os
-import re
 from .doImport import *
 from .doPrep import *
 from .regression import *
@@ -140,18 +139,8 @@ def makeDatasetAfterBaseRegression(df : pd.DataFrame,
         # Note: 350 is a cutoff for players who are not drafted
         og_df = og_df[og_df[scoring.adp_column_name()] < 350].copy()
         og_df.to_pickle(save_path)
-        og_df.to_csv('test.csv', index= False)
+        # og_df.to_csv('test.csv', index= False)
     return og_df
-
-# Load regression results
-def loadDatasetAfterBaseRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
-    path = pathlib.Path(__file__).parent.resolve()
-    os.chdir(path)
-    if not df_path:
-        df_path = '../../data/regression/reg_w_preds_1.p'
-        if use_compressed:
-            df_path = (re.sub(r'\.p$', '_compressed.p', df_path))        
-    return pd.read_pickle(df_path)
 
 def main():
     pd.options.display.max_columns = None

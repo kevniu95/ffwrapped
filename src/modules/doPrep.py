@@ -157,7 +157,7 @@ class PointsDataset(Dataset):
             return result
         return _aggregate_players(df)
     
-    def _filterPredictYear(self, df: pd.DataFrame) -> pd.DataFrame():
+    def _filterPredictYear(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[df['Year'] != self.currentYear]
         
     def _addCurrentRosters(self, df : pd.DataFrame) -> None:
