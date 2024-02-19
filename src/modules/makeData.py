@@ -161,7 +161,7 @@ def makeDataForQuery(year : int, temp : float, scoringType = ScoringType, models
     z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
     z['league'] = leagueId
     z['year'] = year
-    print("Done with this iteration.\n")
+    # print("Done with this iteration.\n")
     
     # Merge x and y together
     x.sort_values(['team','FantPos'], inplace= True)
@@ -229,5 +229,12 @@ if __name__ == '__main__':
     # Create data for query
     # ============
     models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
-    makeDataForQuery(2023, 4, ScoringType.HPPR, models = models)
-
+    st = time.time()
+    for i in range(4500):
+        if i % 50 == 0:
+            logger.info(f"Starting iteration {i}")
+            logger.info(f"50 its took {time.time()  - st}")
+            st = time.time()
+        for year in range(2023, 2024):
+            makeDataForQuery(year, 4, ScoringType.HPPR, models = models)
+    
