@@ -132,14 +132,19 @@ def _finalizePickDataset(df: pd.DataFrame, score_df: pd.DataFrame, leagueId: str
     final_picks = final_picks[['league','team','Total','pick','pfref_id','FantPos']].sort_values(['team','pick'])
     return final_picks
 
-def _savePicks(final_picks: pd.DataFrame, year: int):
-    path = f'../../data/regression/queryableDraftPicks{year}.csv'
+def _savePicks(final_picks: pd.DataFrame, year: int, saveLocation: str):
+    path = saveLocation.format(year)
     if os.path.exists(path):
         final_picks.to_csv(path, mode = 'a', header = False, index = False)
     else:
         final_picks.to_csv(path, index = False)
 
-def makeDataForQuery(year : int, temp : float, scoringType = ScoringType, models = Dict[str, sklearn.pipeline.Pipeline], leagueId : str = None) -> pd.DataFrame:
+def makeDataForQuery(year : int, 
+                     temp : float, 
+                     scoringType = ScoringType, 
+                     models = Dict[str, sklearn.pipeline.Pipeline], 
+                     saveLocation = '../../data/regression/queryableDraftPicks{}.csv',
+                     leagueId : str = None) -> pd.DataFrame:
     if not leagueId:
         alphabet = string.ascii_lowercase + string.digits
         leagueId = ''.join(random.choices(alphabet, k=8))
@@ -178,7 +183,7 @@ def makeDataForQuery(year : int, temp : float, scoringType = ScoringType, models
     score_df = pd.concat(score_dfs)
     
     finalPicks = _finalizePickDataset(df, score_df, leagueId)
-    _savePicks(finalPicks, year)
+    _savePicks(finalPicks, year, saveLocation)
     return finalPicks
 
 def getTeamScoreFromRosterConfig(df : pd.DataFrame, models : Dict[str, sklearn.pipeline.Pipeline]) -> pd.DataFrame:
@@ -230,11 +235,11 @@ if __name__ == '__main__':
     # ============
     models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
     st = time.time()
-    for i in range(4500):
+    for i in range(7000):
         if i % 50 == 0:
             logger.info(f"Starting iteration {i}")
             logger.info(f"50 its took {time.time()  - st}")
             st = time.time()
         for year in range(2023, 2024):
-            makeDataForQuery(year, 4, ScoringType.HPPR, models = models)
+            makeDataForQuery(year, 4, ScoringType.HPPR, models = models, saveLocation = '../../data/regression/queryableDraftPicks_2_{}.csv')
     
