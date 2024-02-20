@@ -96,8 +96,36 @@ def _readQueryableData(year: int = 2023):
     dfs = [pd.read_csv(file) for file in files]
     return pd.concat(dfs, ignore_index=True)
 
+
+class SimulationQueryRunner():
+    def __init__(self):
+        self.scoringType = FIXED_SCORING_TYPE
+        self.colSubset = FIXED_COLS
+        self.colSubset = self.colSubset + [self.scoringType.adp_column_name()]
+        self.year = FIXED_YEAR
+        self.playerInfo = initPlayerPoolDfFromRegDataset(self.year, self.scoringType, self.colSubset)
+
+    def _readQueryData(self):
+        s3 = boto3.client('s3')
+        response = s3.list_objects_v2(Bucket='ffwrapped')
+        dfs = []
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                key = obj['Key']
+                response = s3.get_object(Bucket='ffwrapped', Key=key)
+                
+                # Read the S3 object into a DataFrame
+                df = pd.read_csv(BytesIO(response['Body'].read()))
+                dfs.append(df)
+        if dfs:
+            return pd.concat(dfs, ignore_index=True)
+        else:
+            return pd.DataFrame()
+
+
+
+
 def makeSelections(teamNumber: int, year: int = 2023):
-    logger.info(f"Simulating draft for team {teamNumber} in year {year}")
     scoringType = ScoringType.HPPR
     colSubset = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred']
     colSubset = colSubset + [scoringType.adp_column_name()]
@@ -116,8 +144,8 @@ def makeSelections(teamNumber: int, year: int = 2023):
         availablePlayers = filterByTeamRound(teamNumber, roundNumber, playerPicks, playerInfo, colSubset1, conditions)
         expectedPoints = (availablePlayers['mean'] * availablePlayers['count']).sum() / availablePlayers['count'].sum()
         print(f"Previous selections {conditions}")
-        print(f"Expected points for this selection: {expectedPoints}")
-        print(f"Available samples of data: {availablePlayers['count'].sum() / 2}")
+        print(f"Expected max points for your team going into this selection: {expectedPoints}")
+        print(f"Available samples backing this draft path: {availablePlayers['count'].sum() / 2}")
         print(availablePlayers)
         
         # Query user input until valid seleciton is made
@@ -150,8 +178,20 @@ def makeSelections(teamNumber: int, year: int = 2023):
 if __name__ == '__main__':
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
-    makeSelections(9, 2023)
-    # doIt('team_9')
+
+    print("Welcome to this sample draft simulation! We will be simulating a 10-team HPPR draft for 2023.")
+    selectedTeam = None
+    while not selectedTeam:
+        selectedTeam = input("Which team (int value 1-10) would you like to draft for?\n")
+        try:
+            selectedTeam = int(selectedTeam)
+        except:
+            selectedTeam = None
+        if not isinstance(selectedTeam, int) or selectedTeam < 1 or selectedTeam > 10:
+            print("Invalid selection. Please enter a number between 1 and 10.")
+            selectedTeam = None
+
+    makeSelections(selectedTeam, 2023)
 
 # Test pickNumber
 # last = 0
