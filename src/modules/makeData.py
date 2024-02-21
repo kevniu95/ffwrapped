@@ -235,11 +235,11 @@ if __name__ == '__main__':
     # ============
     models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
     st = time.time()
-    for i in range(7000):
+    for i in range(4200):
         if i % 50 == 0:
             logger.info(f"Starting iteration {i}")
             logger.info(f"50 its took {time.time()  - st}")
             st = time.time()
-        for year in range(2023, 2024):
-            makeDataForQuery(year, 4, ScoringType.HPPR, models = models, saveLocation = '../../data/regression/queryableDraftPicks_2_{}.csv')
-    
+        for i in range(3, 10):
+            for year in range(2023, 2024):
+                makeDataForQuery(year, 4, ScoringType.HPPR, models = models, saveLocation = f'../../data/regression/queryableDraftPicks_{i}__{year}.csv')

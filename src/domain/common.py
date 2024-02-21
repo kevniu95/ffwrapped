@@ -72,11 +72,13 @@ WEEKLY_STATS_PARAMS = {'request' : '1',
                                     'offset' : '0'}
 
 # Load regression results
-def loadDatasetAfterBaseRegression(df_path : str = None, use_compressed : bool = True) -> pd.DataFrame:
+def loadDatasetAfterBaseRegression(df_path : str = None
+                                   #, use_compressed : bool = True
+                                   ) -> pd.DataFrame:
     path = pathlib.Path(__file__).parent.resolve()
     os.chdir(path)
     if not df_path:
         df_path = '../../data/regression/reg_w_preds_1.p'
-        if use_compressed:
-            df_path = (re.sub(r'\.p$', '_compressed.p', df_path))        
+        # if use_compressed:
+            # df_path = (re.sub(r'\.p$', '_compressed.p', df_path))        
     return pd.read_pickle(df_path)

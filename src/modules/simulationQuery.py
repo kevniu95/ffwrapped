@@ -96,35 +96,6 @@ def _readQueryableData(year: int = 2023):
     dfs = [pd.read_csv(file) for file in files]
     return pd.concat(dfs, ignore_index=True)
 
-
-class SimulationQueryRunner():
-    def __init__(self):
-        self.scoringType = FIXED_SCORING_TYPE
-        self.colSubset = FIXED_COLS
-        self.colSubset = self.colSubset + [self.scoringType.adp_column_name()]
-        self.year = FIXED_YEAR
-        self.playerInfo = initPlayerPoolDfFromRegDataset(self.year, self.scoringType, self.colSubset)
-
-    def _readQueryData(self):
-        s3 = boto3.client('s3')
-        response = s3.list_objects_v2(Bucket='ffwrapped')
-        dfs = []
-        if 'Contents' in response:
-            for obj in response['Contents']:
-                key = obj['Key']
-                response = s3.get_object(Bucket='ffwrapped', Key=key)
-                
-                # Read the S3 object into a DataFrame
-                df = pd.read_csv(BytesIO(response['Body'].read()))
-                dfs.append(df)
-        if dfs:
-            return pd.concat(dfs, ignore_index=True)
-        else:
-            return pd.DataFrame()
-
-
-
-
 def makeSelections(teamNumber: int, year: int = 2023):
     scoringType = ScoringType.HPPR
     colSubset = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred']
