@@ -1,7 +1,7 @@
 # ffwrapped
 ## Currently offers 2023 simulationQuery service
 ### Description:
-- Users can maximize potential of their fantasy team by simulating round-by-round selection in 10-team, 2023 NFL snake draft.
+- Users can maximize potential of their fantasy team by simulating round-by-round selection in 10-team, 2023 NFL snake draft (yes the 2023 season already happened, and yes, I did use a crude version of this tool to win my fantasy league!)
 - We've run nearly 100,000 simulated fantasy drafts and combined with predictive machine learning algorithms to provide real-time estimates for which roster choices will help your team the most!
 
 ### Try it yourself!
