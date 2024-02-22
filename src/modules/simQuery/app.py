@@ -1,12 +1,16 @@
 from flask import Flask, request, jsonify
+import logging
+from .simulationQuery import SimulationQueryRunner
+from .cli import FIXED_SCORING_TYPE, FIXED_COLS, FIXED_YEAR
+from ...util.logger_config import setup_logger
+
+LOG_LEVEL = logging.DEBUG
+logger = setup_logger(__name__, level = LOG_LEVEL)
 
 app = Flask(__name__)
-
-from .simulationQuery import *
 sqr = SimulationQueryRunner(FIXED_SCORING_TYPE, FIXED_COLS, FIXED_YEAR)
 
 # Define a route for the GET request
-
 @app.route('/drafts/summary', methods=['POST'])
 def get_draft_summary():
     logger.info("Here we are, getting the draft summary...")
@@ -27,6 +31,7 @@ def get_draft_summary():
         return jsonify({'error': 'Invalid team or round number'}), 400
     
     # Assuming sqr.getPreselectInfo returns the expected data correctly
+    conditions = [tuple(item) for item in conditions] # need to convert to tuple of tuples, JSON doesn't recognize tuple
     thisPickNumber, availablePlayers, expectedPoints = sqr.getPreselectInfo(teamNumber, roundNumber, conditions)
     availablePlayers_json = availablePlayers.to_json(orient='records')
     return jsonify({'pickNumber': thisPickNumber, 'availablePlayers': availablePlayers_json, 'expectedPoints': expectedPoints})
