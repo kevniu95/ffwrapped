@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify
 import logging
 from .simulationQuery import SimulationQueryRunner
-from .cli import FIXED_SCORING_TYPE, FIXED_COLS, FIXED_YEAR
 from ...util.logger_config import setup_logger
+from ...domain.common import ScoringType
 
 LOG_LEVEL = logging.DEBUG
 logger = setup_logger(__name__, level = LOG_LEVEL)
+
+FIXED_SCORING_TYPE = ScoringType.HPPR
+FIXED_COLS = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred'] + [FIXED_SCORING_TYPE.adp_column_name()]
+FIXED_YEAR = 2023
 
 app = Flask(__name__)
 sqr = SimulationQueryRunner(FIXED_SCORING_TYPE, FIXED_COLS, FIXED_YEAR)

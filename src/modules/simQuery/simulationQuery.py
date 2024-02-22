@@ -1,9 +1,9 @@
-import pandas as pd
 import glob
 import logging
 import numpy as np
 from io import BytesIO
 from typing import List, Tuple, Set
+import pandas as pd
 import boto3 
 from functools import lru_cache
 import requests
@@ -15,7 +15,8 @@ LOG_LEVEL = logging.DEBUG
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 IN_DEV = True
-RUNNER_BASE_URL = 'http://127.0.0.1:5000'
+RUNNER_BASE_URL = 'https://8fktyt5czr.us-east-2.awsapprunner.com'
+# Simply-deployed service using AWS App Runner - will change this to ECS deployment with permanent URL
 
 # May need to revisit this, when we are no longer holding all data in memory
 # def generateFirstPickSummaries():
@@ -163,7 +164,6 @@ class SimulationQueryRunner(ISimulationQueryRunner):
     def _applySingleLimitation(self, df: pd.DataFrame, condition: Tuple[int, str]) -> Set[str]:
         strCondition = condition[1]
         filteredLeagues = df.loc[df.eval(strCondition),'league'].unique()
-        logger.info(f"Filtered leagues: {filteredLeagues} in single limitation")
         return set(filteredLeagues)
 
     @lru_cache(maxsize=64)
@@ -195,11 +195,11 @@ class SimulationQueryRunner(ISimulationQueryRunner):
                           conditions: List[str]):
         logger.debug("In filter by team round method of SQR...")
         # Limit all leagues to those that match initial conditions
-        logger.info(f"Here are conditions before tuple-izing: {conditions}")
+        # logger.info(f"Here are conditions before tuple-izing: {conditions}")
         conditionsTuple = tuple(conditions)
-        logger.info(f"here are conditions as a tuple {conditionsTuple}")
+        # logger.info(f"here are conditions as a tuple {conditionsTuple}")
         filteredLeagues = self._limitLeagues(conditionsTuple)
-        logger.info(f"Here are filtered leagues: {filteredLeagues}")
+        # logger.info(f"Here are filtered leagues: {filteredLeagues}")
         playerPicks = self.playerPicks[self.playerPicks['league'].isin(filteredLeagues)].copy()
         
         # Return player picks for team and round, subject to conditions

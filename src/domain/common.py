@@ -2,7 +2,6 @@ from enum import Enum
 import datetime
 import pathlib
 import os
-import re
 import pandas as pd
 
 class ScoringType(Enum):

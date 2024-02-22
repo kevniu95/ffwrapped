@@ -2,24 +2,14 @@ from typing import List
 import logging
 import pandas as pd
 
-from ...domain.common import ScoringType
 from ...util.logger_config import setup_logger
 from .simulationQuery import SimulationQueryService
 LOG_LEVEL = logging.DEBUG
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
-FIXED_SCORING_TYPE = ScoringType.HPPR
-FIXED_YEAR = 2023
-FIXED_COLS = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2','var_pred'] + [FIXED_SCORING_TYPE.adp_column_name()]
-
-
 class SimulationQueryCLI():
     def __init__(self,
-                 scoringType: ScoringType = FIXED_SCORING_TYPE,
-                 year: int = FIXED_YEAR,
                  selectedTeam: int = None):
-        self.scoringType = scoringType
-        self.year = year
         self.runner = SimulationQueryService()
         self.selectedTeam = selectedTeam
 
