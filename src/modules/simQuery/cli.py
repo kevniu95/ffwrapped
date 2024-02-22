@@ -4,7 +4,7 @@ import pandas as pd
 
 from ...util.logger_config import setup_logger
 from .simulationQuery import SimulationQueryService
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 class SimulationQueryCLI():
@@ -82,7 +82,7 @@ class SimulationQueryCLI():
                 continue
             # Make selection
             selection = self.runner.makeSelection(enteredList, thisPickNumber)
-            logger.info(f"Appending to conditions something of type {type((thisPickNumber, selection))}")
+            logger.debug(f"Appending to conditions something of type {type((thisPickNumber, selection))}")
             conditions.append((thisPickNumber, selection))
             logger.debug(f"Conditions: {conditions}")
             roundNumber += 1

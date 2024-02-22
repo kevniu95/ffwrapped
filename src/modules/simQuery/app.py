@@ -4,7 +4,7 @@ from .simulationQuery import SimulationQueryRunner
 from ...util.logger_config import setup_logger
 from ...domain.common import ScoringType
 
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 FIXED_SCORING_TYPE = ScoringType.HPPR

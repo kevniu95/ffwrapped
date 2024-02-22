@@ -1,7 +1,7 @@
 import glob
 import logging
 import numpy as np
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import List, Tuple, Set
 import pandas as pd
 import boto3 
@@ -11,7 +11,7 @@ import json
 
 from ...domain.common import ScoringType, loadDatasetAfterBaseRegression
 from ...util.logger_config import setup_logger
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = LOG_LEVEL)
 
 IN_DEV = True
@@ -64,7 +64,7 @@ class SimulationQueryService(ISimulationQueryRunner):
         self.base_url = base_url
     
     def getPreselectInfo(self, teamNumber: int, roundNumber: int, conditions: List[str]) -> Tuple[int, pd.DataFrame, float]:
-        logger.info("Trying to get preselect info from service...")
+        logger.debug("Trying to get preselect info from service...")
         headers = {'Content-Type': 'application/json'}
         data = json.dumps({
             'teamNumber': teamNumber,
@@ -72,13 +72,13 @@ class SimulationQueryService(ISimulationQueryRunner):
             'conditions': conditions
         })
 
-        logger.info(f"Sending POST request with this data {conditions}")
+        logger.debug(f"Sending POST request with this data {conditions}")
         response = requests.post(f'{self.base_url}/drafts/summary', headers=headers, data=data)
         if response.status_code == 200:
             # Assuming the response is JSON and contains the expected fields
             response_data = response.json()
             availablePlayers_json = response_data['availablePlayers']
-            availablePlayers_df = pd.read_json(availablePlayers_json)
+            availablePlayers_df = pd.read_json(StringIO(availablePlayers_json))
             return (response_data['pickNumber'], availablePlayers_df, response_data['expectedPoints'])
         else:
             # Handle error or empty response appropriately
@@ -86,14 +86,14 @@ class SimulationQueryService(ISimulationQueryRunner):
             return None
     
     def makeSelection(self, idList: List[str], pickNum: int):
-        logger.info("Trying to make selection from service...")
+        logger.debug("Trying to make selection from service...")
         headers = {'Content-Type': 'application/json'}
         data = json.dumps({
             'idList': idList,
             'pickNumber': pickNum
         })
 
-        logger.info("Sending POST request to make selection...")
+        logger.debug("Sending POST request to make selection...")
         response = requests.post(f'{self.base_url}/drafts/selection', headers=headers, data=data)
         if response.status_code == 200:
             # Assuming the response is JSON and contains the expected fields
