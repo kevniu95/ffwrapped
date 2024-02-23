@@ -33,11 +33,14 @@ class SimulationQueryCLI():
                             availablePlayers: pd.DataFrame,
                             conditions: List[str],
                             expectedPoints: float):
-        print(f"\nRound: {roundNumber} \ Pick: {pickNumber- (roundNumber - 1) * 10} \ Overall: {pickNumber}")
-        print(f"Team {self.selectedTeam}, please make your selection for Round {roundNumber}")
+        print(f"\n========== Round {roundNumber} Info ==========")
+        print(f"Round: {roundNumber} \ Pick: {pickNumber- (roundNumber - 1) * 10} \ Overall: {pickNumber}")
         print(f"Previous selections {conditions}")
-        print(f"Expected max points for your team going into this selection: {expectedPoints}")
-        print(f"Available samples backing this draft path: {availablePlayers['count'].sum() / 2}")
+        print(f"Expected max points for your team going into this selection: {round(expectedPoints, 2)}")
+        # format availablePlayers['count'].sum() / 2 to int with commas
+        print(f"Available samples backing this draft path: {int(availablePlayers['count'].sum() / 2):,}")
+        print("====================================\n")
+        print(f"Ok team {self.selectedTeam}, please make your selection for Round {roundNumber}:")
         print(availablePlayers)
 
     def requestSelection(self, roundNumber: int, availablePlayers: pd.DataFrame, conditions: List[str]):
@@ -67,7 +70,11 @@ class SimulationQueryCLI():
             
     def startup(self):
         logger.debug("In startup method of CLI...")
-        print("Welcome to this sample draft simulation! We will be simulating a 10-team HPPR draft for the year2023.")
+        print('================')
+        print("Welcome to simquery!")
+        print('================')
+
+        print("We will be simulating a 10-team HPPR draft for the year 2023.\n")
         self.selectedTeam = self._selectTeam()
         roundNumber = 1
         conditions = []
