@@ -169,7 +169,7 @@ That runs counter to conventional wisdom for sure - Patrick Mahomes, the predict
 ### Keep draft context in mind
 Perhaps there is - but remember to use this tool in context. Yes, the simquery tool says selecting AvgQB at #9 will give you more expected max points than selecting AvgRB. But Patrick Mahomes accounts for 1,451 of those draft paths, and Josh Allen accounts for 617 (over 80% of the 2,368 observations backing AvgQB!). And their average draft positions are 16.5 and 20.
 
-If you're picking 9 now, that means your next pick is 12 overal. Mahomes and Allen will almost certainly be on the board for your round 2 pick!
+If you're picking 9 now, that means your next pick is 12 overall. Mahomes and Allen will almost certainly be on the board for your round 2 pick!
 
 So even if AvgQB looks like a better pick than AvgRB with your first overall pick - maybe the real question we should be asking ourselves, is, which of these two options is better:
 
