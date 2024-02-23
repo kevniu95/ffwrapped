@@ -111,7 +111,7 @@ Do some of those numbers look familiar?
 Sure they do! Now that we've chosen Barkley, our summary shows that
 
  - There are 6,240 leagues where the 9th overall selection was Barkley.
- - On average they had expected max points score of 95.9.
+ - On average teams thath selected Barkley 9th had expected max points score of 95.9.
  
 Of course, we saw  those figures from his row back in the Player Table for round 1!
 
