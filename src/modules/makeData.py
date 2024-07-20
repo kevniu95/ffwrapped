@@ -89,7 +89,89 @@ def getRosterConfigVariables(df : pd.DataFrame, league : League) -> pd.DataFrame
     df_extended = pd.DataFrame(lst, columns=rows[0].keys())
     return df_extended
 
-def makeDataForRegression(year : int, temp : float, scoringType = ScoringType, leagueId : int = None, savePlayerList: bool = True) -> pd.DataFrame:
+class MaxPointsScoredPredictors():
+    '''
+    This class encapsulates the 'x' values for regression model in predicting
+    max possible points scored by a team in any given week
+
+    e.g., 1. original iteration was RosterConfig variables
+          2. new iteration is predicted PF of starters
+    
+    These are input, or 'x' variables to regression model. Goal is to determine how much
+    better rosterConfig makes our predictions
+    '''
+    def __init__(self, draft: Draft):
+        self.draft : Draft = draft
+    
+    def getRegressionSet(self):
+        pass
+    
+    
+class MaxPointsScoredPredictorsRosterConfig(MaxPointsScoredPredictors):
+    def getRegressionSet(self, y: pd.DataFrame, leagueId: int, year: int, points_name: str):
+        drafted = self.draft.drafted.copy()
+        league = self.draft.league
+        if drafted is None or drafted.empty:
+            raise ValueError(f"No drafted players in draft {leagueId}")
+        
+        x = self._getRosterConfigVariables(drafted, league)
+        
+        # Merge x and y together
+        x.sort_values(['team','FantPos'], inplace= True)
+        z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
+        z['league'] = leagueId
+        z['year'] = year
+        return z[['year','league','team','FantPos',points_name, 'A_pred_points','A_std_error', 'B_pred_points', 'B_std_error', 'num_others', 'avg_pred_points_other', 'avg_std_error_other']]
+    
+    def _getRosterConfigVariables(self, df : pd.DataFrame, league : League) -> pd.DataFrame:
+        lst = []
+        df.sort_values(['team', 'FantPos', 'pred'], ascending = [True, True, False], inplace = True)
+        for team in df['team'].unique():
+            team = league.getTeamFromId(team)
+            rows = team.getRosterConfigOneTeam(df)
+            lst.extend(rows)
+        df_extended = pd.DataFrame(lst, columns=rows[0].keys())
+        return df_extended
+
+class MaxPointsScoredPredictorsStarters(MaxPointsScoredPredictors):
+    def getRegressionSet(self, y: pd.DataFrame, leagueId: int, year: int, points_name: str):
+        drafted = self.draft.drafted.copy()
+        league = self.draft.league
+        if drafted is None or drafted.empty:
+            raise ValueError(f"No drafted players in draft {leagueId}")
+
+        x = self._getRosterConfigVariables(drafted, league)
+        x = self._mapRosterConfigToStarter(x)
+        y = y.groupby(['team']).sum(points_name).reset_index()
+        z = y.merge(x, on = 'team')
+        z['league'] = leagueId
+        z['year'] = year        
+        return z[['year','league','team','Pts_HPPR', 'final_points']]
+
+    def _getRosterConfigVariables(self, df : pd.DataFrame, league : League) -> pd.DataFrame:
+        lst = []
+        df.sort_values(['team', 'FantPos', 'pred'], ascending = [True, True, False], inplace = True)
+        for team in df['team'].unique():
+            team = league.getTeamFromId(team)
+            rows = team.getRosterConfigOneTeam(df)
+            lst.extend(rows)
+        df_extended = pd.DataFrame(lst, columns=rows[0].keys())
+        return df_extended
+
+    def _mapRosterConfigToStarter(self, df: pd.DataFrame) -> pd.DataFrame:
+        df1 = df[['team', 'A_pred_points']].groupby(['team']).sum('A_pred_points').reset_index()
+        df2 = df.loc[df['FantPos'].isin(['RB','WR']), ['team','B_pred_points']].groupby(['team']).sum('B_pred_points').reset_index()
+        df3 = df1.merge(df2)
+        df3['final_points'] = df3['A_pred_points'] + df3['B_pred_points']
+        return df3[['team', 'final_points']]
+        
+
+def makeDataForRegression(year : int, 
+                          temp : float, 
+                          scoringType = ScoringType, 
+                          predictorTypes = List[callable],
+                          leagueId : int = None, 
+                          savePlayerList: bool = True) -> List[pd.DataFrame]:
     if not leagueId:
         alphabet = string.ascii_lowercase + string.digits
         leagueId = ''.join(random.choices(alphabet, k=8))
@@ -97,32 +179,21 @@ def makeDataForRegression(year : int, temp : float, scoringType = ScoringType, l
     # Simulate draft
     logger.debug(f"Simulating draft for year {year}...")
     finishedDraft = simulateLeagueAndDraft(year, temp, scoringType = scoringType)
-    df = finishedDraft.pool.df
-    undrafted = df.loc[df['team'].isnull()]
-    drafted = df.loc[df['team'].notnull(), ['pfref_id','team', 'FantPos', 'pred', 'var_pred']]
-    
+        
     # Undrafted Players -> baseline
     points_name = scoringType.points_name()
-    logger.debug(f"Generating baselines...")
-    # st = time.time()
-    if year != 2023:
-        baselinePoints = getBaselinePointDict(undrafted, points_name)
-        appendMe : pd.DataFrame = generateBaselines(baselinePoints, finishedDraft.league.teams)
-    # logger.info(f"Time to generate baselines: {time.time() - st}")
-
-    # Generate Y - Average Total PF for each team, for each position
-        # Total by week -  so 2x average RB score for RB
-    logger.debug("Generating y...")
-    y = generateY(drafted, appendMe, scoringType, year)
-    x = getRosterConfigVariables(drafted, finishedDraft.league)
-    
-    # Merge x and y together
-    x.sort_values(['team','FantPos'], inplace= True)
-    z = y.merge(x, on = ['team', 'FantPos'], how = 'right')
-    z['league'] = leagueId
-    z['year'] = year
-    return z[['year','league','team','FantPos',points_name, 'A_pred_points','A_std_error', 'B_pred_points', 'B_std_error', 'num_others', 'avg_pred_points_other', 'avg_std_error_other']]
-
+    baselinePoints = getBaselinePointDict(finishedDraft.undrafted, points_name)
+    appendMe : pd.DataFrame = generateBaselines(baselinePoints, finishedDraft.league.teams)
+    y = generateY(finishedDraft.drafted, appendMe, scoringType, year)
+        
+    # Get dfs for each predictor
+    return_dfs = []
+    predictors: List[MaxPointsScoredPredictors] = [predictorType(finishedDraft) for predictorType in predictorTypes]
+    for predictor in predictors:
+        z = predictor.getRegressionSet(y, leagueId, year, points_name)
+        return_dfs.append(z)
+    return return_dfs
+   
 def _finalizePickDataset(df: pd.DataFrame, score_df: pd.DataFrame, leagueId: str):
     df['league'] = leagueId
     
@@ -230,6 +301,11 @@ if __name__ == '__main__':
     #         else:
     #             a.to_csv(path, index = False)
     
+    # , 
+    predictorTypes = [MaxPointsScoredPredictorsStarters, MaxPointsScoredPredictorsRosterConfig]
+    a = makeDataForRegression(2022, 4, ScoringType.HPPR, predictorTypes)
+    print(a[0].head())
+    print(a[1].head())
     # ============
     # Create data for query
     # ============
