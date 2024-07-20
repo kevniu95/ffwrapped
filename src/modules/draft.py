@@ -321,6 +321,16 @@ class SnakeDraft(Draft):
             finalList.extend(teamList[::-1])
         self.draftOrder = finalList
         return finalList
+    
+    @property
+    def drafted(self) -> pd.DataFrame:
+        if not (self.pool.df is None or self.pool.df.empty):
+            return self.pool.df[self.pool.df['team'].notnull()]
+    
+    @property 
+    def undrafted(self) -> pd.DataFrame:
+        if not (self.pool.df is None or self.pool.df.empty):
+            return self.pool.df[self.pool.df['team'].isnull()]
 
 def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
     x = x / T 
