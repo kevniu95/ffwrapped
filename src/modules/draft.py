@@ -328,7 +328,7 @@ def softmax(x : pd.Series, T : float = 1.0) -> pd.Series:
     return e_x / e_x.sum(axis=0)
 
 def initPlayerPoolDfFromRegDataset(year: int, scoringType : ScoringType, colSubset : List[str], use_compressed : bool = False) -> pd.DataFrame:
-    reg_df = loadDatasetAfterBaseRegression(use_compressed=use_compressed)
+    reg_df = loadDatasetAfterBaseRegression()
     reg_df = reg_df.loc[(reg_df ['Year'] == year) 
                     & (reg_df ['foundAdp'].isin(['left_only', 'both'])),
                     colSubset

@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import logging
 from .simulationQuery import SimulationQueryRunner
 from ...util.logger_config import setup_logger
@@ -12,6 +13,7 @@ FIXED_COLS = ['Player','Tm','Age','FantPos','Year','pfref_id','pred','var','var2
 FIXED_YEAR = 2023
 
 app = Flask(__name__)
+CORS(app)
 sqr = SimulationQueryRunner(FIXED_SCORING_TYPE, FIXED_COLS, FIXED_YEAR)
 
 # Define a route for the GET request

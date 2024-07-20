@@ -45,3 +45,13 @@ Our very first service is live now! Check it out!
 
 **Actual Draft Tool:** Train an ML-based draft tool using RL? Make live draft recommendations, like more robust simquery
 
+## 3. Initiatives
+### A. Compare RosterConfig Regression to 
+**Purpose:** Lot of effort goes into doing regression based on roster-configuration metrics. Is it significantly better than naive regression based on total starter points, for instance?
+
+**Subtasks:**
+
+-  1: standardize makeData methods to make regression-ready data
+-  2: standardize regression methods to perform regressions
+-  3: refactor project folders to separate data prep work (doImport, doPrep, doStage) from makeData and regressions
+
