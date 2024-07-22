@@ -1,6 +1,7 @@
 import pathlib
 import os
 from itertools import product
+from functools import lru_cache
 import time
 import logging
 import string
@@ -41,9 +42,13 @@ def generateBaselines(baselines_points : Dict[str, float], teams : Set[Team], po
     }
     return pd.DataFrame(baseline_data)
 
+@lru_cache(maxsize = None)
+def loadWeeklyPointsYear(year: int) -> pd.DataFrame:
+    return pd.read_pickle(f'../../data/imports/created/weekly_points/weekly_points_{year}.p')
+    
 def finalizeWeeklyDf(drafted: pd.DataFrame, appendMe: pd.DataFrame, scoringType: ScoringType, year: int) -> pd.DataFrame:
     points_name = scoringType.points_name()
-    df_dict = pd.read_pickle(f'../../data/imports/created/weekly_points/weekly_points_{year}.p')
+    df_dict = loadWeeklyPointsYear(year)
     weekly_df  = pd.concat(df_dict.values())
     weekly_df = weekly_df.merge(drafted[['pfref_id','team', 'FantPos']], on = 'pfref_id')
     weekly_df = pd.concat([weekly_df, appendMe, appendMe]) # At max, 2 waiver-wire baselines can be selected starters per position
@@ -146,7 +151,7 @@ class MaxPointsScoredPredictorsStarters(MaxPointsScoredPredictors):
         z = y.merge(x, on = 'team')
         z['league'] = leagueId
         z['year'] = year        
-        return z[['year','league','team','Pts_HPPR', 'final_points']]
+        return z[['year','league','team','Pts_HPPR', 'final_pred_points']]
 
     def _getRosterConfigVariables(self, df : pd.DataFrame, league : League) -> pd.DataFrame:
         lst = []
@@ -162,8 +167,8 @@ class MaxPointsScoredPredictorsStarters(MaxPointsScoredPredictors):
         df1 = df[['team', 'A_pred_points']].groupby(['team']).sum('A_pred_points').reset_index()
         df2 = df.loc[df['FantPos'].isin(['RB','WR']), ['team','B_pred_points']].groupby(['team']).sum('B_pred_points').reset_index()
         df3 = df1.merge(df2)
-        df3['final_points'] = df3['A_pred_points'] + df3['B_pred_points']
-        return df3[['team', 'final_points']]
+        df3['final_pred_points'] = df3['A_pred_points'] + df3['B_pred_points']
+        return df3[['team', 'final_pred_points']]
         
 
 def makeDataForRegression(year : int, 
@@ -287,35 +292,35 @@ if __name__ == '__main__':
     # ============
     # Create data for roster config regression
     # ============
-    # st = time.time()
-    # for i in range(2500):
-    #     if i % 50 == 0:
-    #         logger.info(f"Starting iteration {i}")
-    #         logger.info(f"10 its took {time.time()  - st}")
-    #         st = time.time()
-    #     for year in range(2016, 2023):
-    #         a = makeDataForRegression(year, 4, ScoringType.HPPR)
-    #         path = f'../../data/regression/rosterConfig/rosterConfigData1.csv'
-    #         if os.path.exists(path):
-    #             a.to_csv(path, mode = 'a', header = False, index = False)
-    #         else:
-    #             a.to_csv(path, index = False)
+    st = time.time()
+    for i in range(1500):
+        if i % 50 == 0:
+            logger.info(f"Starting iteration {i}")
+            logger.info(f"10 its took {time.time()  - st}")
+            st = time.time()
+        for year in range(2016, 2023):
+            a = makeDataForRegression(year, 4, ScoringType.HPPR, [MaxPointsScoredPredictorsRosterConfig])[0]
+            path = f'../../data/regression/rosterConfig/rosterConfigData1.csv'
+            if os.path.exists(path):
+                a.to_csv(path, mode = 'a', header = False, index = False)
+            else:
+                a.to_csv(path, index = False)
     
     # , 
-    predictorTypes = [MaxPointsScoredPredictorsStarters, MaxPointsScoredPredictorsRosterConfig]
-    a = makeDataForRegression(2022, 4, ScoringType.HPPR, predictorTypes)
-    print(a[0].head())
-    print(a[1].head())
+    # predictorTypes = [MaxPointsScoredPredictorsStarters, MaxPointsScoredPredictorsRosterConfig]
+    # a = makeDataForRegression(2022, 4, ScoringType.HPPR, predictorTypes)
+    # print(a[0].head())
+    # print(a[1].head())
     # ============
     # Create data for query
     # ============
-    models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
-    st = time.time()
-    for i in range(4200):
-        if i % 50 == 0:
-            logger.info(f"Starting iteration {i}")
-            logger.info(f"50 its took {time.time()  - st}")
-            st = time.time()
-        for i in range(3, 10):
-            for year in range(2023, 2024):
-                makeDataForQuery(year, 4, ScoringType.HPPR, models = models, saveLocation = f'../../data/regression/queryableDraftPicks_{i}__{year}.csv')
+    # models : Dict[str, sklearn.pipeline.Pipeline] = initializeModels()    
+    # st = time.time()
+    # for i in range(4200):
+    #     if i % 50 == 0:
+    #         logger.info(f"Starting iteration {i}")
+    #         logger.info(f"50 its took {time.time()  - st}")
+    #         st = time.time()
+    #     for i in range(3, 10):
+    #         for year in range(2023, 2024):
+    #             makeDataForQuery(year, 4, ScoringType.HPPR, models = models, saveLocation = f'../../data/regression/queryableDraftPicks_{i}__{year}.csv')
