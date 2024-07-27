@@ -15,6 +15,12 @@ from ..util.logger_config import setup_logger
 LOG_LEVEL = logging.INFO
 logger = setup_logger(__name__, level = logging.INFO)
 
+"""
+This module creates the roster configuration data that is used in our regressions
+  - This is done by simulating many fantasy drafts and saving out the information
+"""
+
+
 def get_nth_best_players(group) -> pd.DataFrame:
     pos_counts = {'QB' : 5, 'RB' : 10, 'WR' : 10, 'TE' : 5}
     selected_players = []
@@ -138,39 +144,6 @@ class MaxPointsScoredPredictorsRosterConfig(MaxPointsScoredPredictors):
         df_extended = pd.DataFrame(lst, columns=rows[0].keys())
         return df_extended
 
-class MaxPointsScoredPredictorsStarters(MaxPointsScoredPredictors):
-    def getRegressionSet(self, y: pd.DataFrame, leagueId: int, year: int, points_name: str):
-        drafted = self.draft.drafted.copy()
-        league = self.draft.league
-        if drafted is None or drafted.empty:
-            raise ValueError(f"No drafted players in draft {leagueId}")
-
-        x = self._getRosterConfigVariables(drafted, league)
-        x = self._mapRosterConfigToStarter(x)
-        y = y.groupby(['team']).sum(points_name).reset_index()
-        z = y.merge(x, on = 'team')
-        z['league'] = leagueId
-        z['year'] = year        
-        return z[['year','league','team','Pts_HPPR', 'final_pred_points']]
-
-    def _getRosterConfigVariables(self, df : pd.DataFrame, league : League) -> pd.DataFrame:
-        lst = []
-        df.sort_values(['team', 'FantPos', 'pred'], ascending = [True, True, False], inplace = True)
-        for team in df['team'].unique():
-            team = league.getTeamFromId(team)
-            rows = team.getRosterConfigOneTeam(df)
-            lst.extend(rows)
-        df_extended = pd.DataFrame(lst, columns=rows[0].keys())
-        return df_extended
-
-    def _mapRosterConfigToStarter(self, df: pd.DataFrame) -> pd.DataFrame:
-        df1 = df[['team', 'A_pred_points']].groupby(['team']).sum('A_pred_points').reset_index()
-        df2 = df.loc[df['FantPos'].isin(['RB','WR']), ['team','B_pred_points']].groupby(['team']).sum('B_pred_points').reset_index()
-        df3 = df1.merge(df2)
-        df3['final_pred_points'] = df3['A_pred_points'] + df3['B_pred_points']
-        return df3[['team', 'final_pred_points']]
-        
-
 def makeDataForRegression(year : int, 
                           temp : float, 
                           scoringType = ScoringType, 
@@ -198,7 +171,10 @@ def makeDataForRegression(year : int,
         z = predictor.getRegressionSet(y, leagueId, year, points_name)
         return_dfs.append(z)
     return return_dfs
-   
+
+# ========================================================
+# !!! Consider for refactor: move to another class? !!!
+# ========================================================
 def _finalizePickDataset(df: pd.DataFrame, score_df: pd.DataFrame, leagueId: str):
     df['league'] = leagueId
     
@@ -282,6 +258,9 @@ def getTeamScoreFromRosterConfig(df : pd.DataFrame, models : Dict[str, sklearn.p
         sum += base
     score_dict['Total'] = sum
     return pd.DataFrame([score_dict])
+# ========================================================
+# !!! Consider for refactor: move to another class? !!!
+# ========================================================
 
 if __name__ == '__main__':
     pd.options.display.max_columns = None
